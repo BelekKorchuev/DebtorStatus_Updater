@@ -1,5 +1,7 @@
 import json
 import os
+from time import sleep
+
 from bs4 import BeautifulSoup
 import hashlib
 import time
@@ -8,8 +10,10 @@ from datetime import datetime, timedelta
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from logScript import logger
 
+from DBmanager import prepare_data_for_db
+from logScript import logger
+from pars_messageInfo import parse_message_page
 
 # Допустимые типы сообщений
 valid_message_types = {
@@ -107,6 +111,14 @@ def fetch_and_parse_first_page(driver):
         driver.get(url)
         time.sleep(1)  # Ждем 1 секунду для загрузки контента
 
+        search_message_type = driver.find_element(By.ID, "ctl00_cphBody_mdsMessageType_tbSelectedText")  # Очищаем поле
+        search_message_type.click()
+        message_type = driver.find_element(By.CLASS_NAME, "rtLI rtFirst")
+        message_type.click()
+
+        search_button = driver.find_element(By.CLASS_NAME, "ctl00_cphBody_ibMessagesSearch")
+        search_button.click()
+
         # Получаем HTML-код страницы
         soup = BeautifulSoup(driver.page_source, 'html.parser')
 
@@ -172,6 +184,34 @@ def parse_all_pages_reverse(driver):
     visited_pages = set()  # Отслеживание уже обработанных страниц
 
     driver.get(url)
+
+    search_message_type = driver.find_element(By.ID, 'ctl00_cphBody_mdsMessageType_tbSelectedText')  # Очищаем поле
+    search_message_type.click()
+
+    time.sleep(5)
+    # # Ожидаем появления выпадающего списка
+    message_type = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_BodyPlaceHolder_tbSearch"]'))
+    )
+    #
+    # # Вводим текст в поле поиска типа сообщений
+    # message_type.send_keys("Сообщение о судебном акте")
+
+    # Вводим текст в поле поиска через JS
+    # message_type = driver.find_element(By.ID, 'ctl00_BodyPlaceHolder_tbSearch')
+    message_type.click()
+    message_type.send_keys("Сообщение о судебном акте")
+
+    # driver.execute_script("arguments[0].value = 'Сообщение о судебном акте';", message_type)
+
+    time.sleep(5)
+    buttom = driver.find_element(By.ID, 'ctl00_BodyPlaceHolder_btnSearch')
+    buttom.click()
+
+    time.sleep(5)
+    search_button = driver.find_element(By.CLASS_NAME, "ctl00_cphBody_ibMessagesSearch")
+    search_button.click()
+
     time.sleep(2)
     logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {url}')
     soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -268,27 +308,9 @@ def parse_all_pages_reverse(driver):
                             f'Дата: {date}, Тип сообщения: {message_type}, Должник: {debtor}, Кем опубликовано: {published_by}')
                         save_checked_messages(checked_messages)
                         if new_message:
-                            link = new_message["сообщение_ссылка"]
                             try:
-                                # # Парсим содержимое сообщения
-                                # message_content = parse_message_page(link, driver)
-                                # new_message['message_content'] = message_content
-                                #
-                                # # Подготовка данных перед вставкой в БД
-                                # prepared_data = prepare_data_for_db(new_message)
-                                # logger.info(f'Сырые сообщения: %s', str(prepared_data))
-                                #
-                                # # добавление новых АУ и должников
-                                # au_debtorsDetecting(prepared_data)
-                                #
-                                # # Вставляем данные в БД и получаем ID
-                                # insert_message_to_db(prepared_data)
-                                #
-                                # # Форматируем данные
-                                # formatted_data = split_columns(prepared_data)
-                                #
-                                # # Проверяем отформатированные данные
-                                # lots_analyze(formatted_data)
+                                parsed_data = parse_message_page(new_message, driver)
+                                prepered_data = prepare_data_for_db(parsed_data)
 
                             except Exception as e:
                                 logger.error(f"Ошибка при обработке сообщения: {e}")

@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import OperationalError
 
+from search_judgment_act import search_with_pagination
+
 load_dotenv(dotenv_path='.env')
 
 db_name = os.getenv("DB_NAME")
@@ -124,11 +126,11 @@ def prepare_data_for_db(raw_data):
 
     return prepared_data
 
-# отправка данных в базу
+# отправка данных для обновления статуса в базы данных OurCRM и default_db
 def status_updating(data):
     try:
-        conn_crm = get_db1_connection()
-        conn_default = get_db2_connection()
+        conn_crm = get_db2_connection()
+        conn_default = get_db1_connection()
 
         # Создаем курсор
         cursor_crm = conn_crm.cursor()
@@ -166,17 +168,18 @@ def status_updating(data):
         cursor_default.execute(query_default, values_default)
 
         # Фиксируем изменения
-        if conn_crm:
-            conn_crm.rollback()
-        if conn_default:
-            conn_default.rollback()
+        conn_crm.commit()
+        conn_default.commit()
 
 
         logger.info(f"Данные успешно добавлены в базу для {data['ИНН']}")
     except Exception as e:
-        logger.error(f"Ошибка вставки данных в базу для {data['ИНН']}: {e}")
-        conn_crm.rollback()
-        conn_default.rollback()
+        logger.error(f"Ошибка вставки данных в базы для ИНН: {data.get('ИНН')}. Ошибка: {e}")
+        # Фиксируем изменения
+        if conn_crm:
+            conn_crm.rollback()
+        if conn_default:
+            conn_default.rollback()
     finally:
         if cursor_crm:
             cursor_crm.close()
@@ -187,11 +190,11 @@ def status_updating(data):
         if conn_default:
             conn_default.close()
 
-# отправка данных в базу
+# отправка данных для обновления статуса и АУ в базы данных OurCRM и default_db
 def status_au_updating(data):
     try:
-        conn_crm = get_db1_connection()
-        conn_default = get_db2_connection()
+        conn_crm = get_db2_connection()
+        conn_default = get_db1_connection()
 
         # Создаем курсор
         cursor_crm = conn_crm.cursor()
@@ -199,18 +202,21 @@ def status_au_updating(data):
 
         query_crm = '''
             INSERT INTO debtor_status_newau (
-                дата, должник, должник_ссылка, сообщение_ссылка, текущий_статус,   
+                дата, должник, должник_ссылка, сообщение_ссылка, арбитр_ссылка ,текущий_статус,   
                 наименование_должника, адрес, ОГРН, ИНН, номер_дела, дата_рождения, место_рождения,
-                место_жительства, СНИЛС, текст, ссылка_файл
+                место_жительства, СНИЛС, ФИО_АУ, адрес_корреспонденции, почта, СРО_АУ,
+                адрес_СРО_АУ, текст, ссылка_файл
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             '''
         values_crm = (
-            data['дата'], data['должник'],
-            data["должник_ссылка"], data["сообщение_ссылка"],
-            data["cудебный_акт"],
-            data["наименование_должника"], data["адрес"], data["ОГРН"],
-            data["ИНН"], data["номер_дела"], data["дата_рождения"], data['место_рождения'],
-            data['место_жительства'], data['СНИЛС'], data['текст'], data['ссылка_файл']
+            data.get('дата'), data.get('должник'),
+            data.get("должник_ссылка"), data.get("сообщение_ссылка"), data.get('арбитр_ссылка'),
+            data.get("cудебный_акт"),
+            data.get("наименование_должника"), data.get("адрес"), data.get("ОГРН"),
+            data.get("ИНН"), data.get("номер_дела"), data.get("дата_рождения"), data.get('место_рождения'),
+            data.get('место_жительства'), data.get('СНИЛС'), data.get('ФИО_АУ'), data.get('адрес_корреспонденции'),
+            data.get('почта'), data.get('СРО_АУ'), data.get('адрес_СРО_АУ'),
+            data.get('текст'), data.get('ссылка_файл')
         )
         cursor_crm.execute(query_crm, values_crm)
 
@@ -218,28 +224,31 @@ def status_au_updating(data):
         # SQL-запрос для вставки данных
         query_default = '''
             UPDATE dolzhnik 
-            SET текущий_статус = %s
+            SET текущий_статус = %s, ФИО_АУ = %s, адрес_корреспонденции = %s,
+            почта = %s, СРО_АУ = %s, адрес_СРО_АУ = %s
             WHERE Инн_Должника = %s
             '''
 
         values_default = (
-            data['cудебный_акт'], data['ИНН']
+            data.get('cудебный_акт'), data.get('ФИО_АУ'), data.get('адрес_корреспонденции'),
+            data.get('почта'), data.get('СРО_АУ'), data.get('адрес_СРО_АУ'), data.get('ИНН')
         )
         # Выполняем запрос с передачей данных из словаря
         cursor_default.execute(query_default, values_default)
 
         # Фиксируем изменения
-        if conn_crm:
-            conn_crm.rollback()
-        if conn_default:
-            conn_default.rollback()
+        conn_crm.commit()
+        conn_default.commit()
 
 
         logger.info(f"Данные успешно добавлены в базу для {data['ИНН']}")
     except Exception as e:
-        logger.error(f"Ошибка вставки данных в базу для {data['ИНН']}: {e}")
-        conn_crm.rollback()
-        conn_default.rollback()
+        logger.error(f"Ошибка вставки данных в базы для ИНН: {data.get('ИНН')}. Ошибка: {e}")
+        # Фиксируем изменения
+        if conn_crm:
+            conn_crm.rollback()
+        if conn_default:
+            conn_default.rollback()
     finally:
         if cursor_crm:
             cursor_crm.close()
@@ -251,8 +260,9 @@ def status_au_updating(data):
             conn_default.close()
 
 # проверка статуса должника
-def before_check(data):
+def before_check(driver, data):
     status = data['Судебный акт']
+    debtor_link = data['должник_ссылка']
 
     list_of_status = {'о введении наблюдения', 'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
                       'о признании должника банкротом и открытии конкурсного производства', 'о передаче дела на рассмотрение другого арбитражного суда об утверждении плана реструктуризации долгов гражданина',
@@ -263,9 +273,10 @@ def before_check(data):
 
     if status in list_of_status:
         status_updating(data)
+        logger.info('найден соответствущий статус')
 
     if status in changed_au:
-        status_au_updating(data)
+        search_with_pagination(driver, debtor_link)
 
 
 

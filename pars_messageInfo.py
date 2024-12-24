@@ -5,6 +5,15 @@ import time
 from selenium.webdriver.support import expected_conditions as EC
 from logScript import logger
 
+list_of_status = {'о введении наблюдения',
+                  'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
+                  'о признании должника банкротом и открытии конкурсного производства',
+                  'о передаче дела на рассмотрение другого арбитражного суда об утверждении плана реструктуризации долгов гражданина',
+                  'о признании должника банкротом и введении реализации имущества гражданина',
+                  'о напременении в отношении гражданина правила об освобождении от исполнения обязательств',
+                  'о завершении реализации имущества гражданина', 'о прекращении производства по делу'}
+
+changed_au = {'об утверждении арбитражного управляющего'}
 
 def parse_message_page(data, driver):
     try:
@@ -67,7 +76,6 @@ def parse_message_page(data, driver):
         data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
         file_links = []
-        # doc need pard\
         pinned_files = soup.find_all('a', class_='Reference')
         if pinned_files:
             for file in pinned_files:
@@ -77,6 +85,44 @@ def parse_message_page(data, driver):
             file_links.append("Нет файлов")
 
         data.update({'файлы': " ".join(file_links)})
+
+        return data
+    except Exception as e:
+        logger.error(f'Не удалось спарсить содержимое сообщения: {e}')
+        return None
+
+
+def search_message_page(data, driver):
+    try:
+        url = data['сообщение_ссылка']
+        logger.info(f'Переход по ссылке: {url}')
+
+        # Переход по ссылке
+        driver.get(url)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, 'red_small'))
+        )
+        # Подождем несколько секунд, чтобы страница полностью загрузилась
+        time.sleep(2)
+
+        # Получение HTML-кода страницы
+        html = driver.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # Словарь для сохранения данных
+        data = {}
+
+        # Основная информация
+        table_main = soup.find('table', class_='headInfo')
+        if table_main:
+            rows = table_main.find_all('tr')
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) == 2:
+                    field = cells[0].text.strip()
+                    value = cells[1].text.strip()
+                    data[field] = value
+
 
         return data
     except Exception as e:

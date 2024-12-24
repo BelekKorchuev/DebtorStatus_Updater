@@ -6,7 +6,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
-from DBmanager import prepare_data_for_db
+from DBmanager import prepare_data_for_db, before_check
 from logScript import logger
 from queue import Queue
 
@@ -95,6 +95,8 @@ def main():
 
     while True:
         try:
+
+
             # Проверка, нужно ли перезапустить драйвер
             if not is_browser_alive(driver):
                 logger.warning("Браузер перестал отвечать. Перезапуск...")
@@ -118,6 +120,9 @@ def main():
                 # Парсим содержимое сообщения
                 parsed_data = parse_message_page(new_messages, driver)
                 prepered_data = prepare_data_for_db(parsed_data)
+
+                # метод для проверки статуса и отправки в базу данных
+                before_check(driver, prepered_data)
 
 
 
