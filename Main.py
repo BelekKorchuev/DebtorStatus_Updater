@@ -1,13 +1,17 @@
 import time
+from threading import Thread
+
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
+from DBmanager import prepare_data_for_db
 from logScript import logger
 from queue import Queue
 
-
+from monitoring import clear_form_periodically, fetch_and_parse_first_page, parse_all_pages_reverse
+from pars_messageInfo import parse_message_page
 
 # Конфигурация Chrome
 chrome_options = Options()
@@ -26,6 +30,27 @@ def restart_driver(driver):
     except Exception as e:
         logger.error(f"Ошибка при завершении WebDriver: {e}")
     return create_driver()
+
+def monitor_threads(threads, restart_queue):
+    """
+    Мониторинг состояния потоков. Перезапускает поток, если он завершился.
+    """
+    while True:
+        for i, thread in enumerate(threads):
+            if not thread.is_alive():
+                logger.error(f"Поток {thread.name} завершился. Перезапуск...")
+
+                # Перезапуск потока
+                if thread.name == "ClearFormThread":
+                    new_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
+                                        name="ClearFormThread")
+                else:
+                    continue
+
+                threads[i] = new_thread  # Заменяем завершившийся поток на новый
+                new_thread.start()
+
+        time.sleep(5)  # Проверка каждые 5 секунд
 
 # Функция проверки состояния браузера
 def is_browser_alive(driver):
@@ -46,12 +71,41 @@ def is_browser_alive(driver):
 def main():
     driver = create_driver()  # Инициализация WebDriver
 
+    # Очередь для перезапуска драйвера
+    restart_queue = Queue()
+
+    # Обход всех страниц при старте
+    logger.info("Запускаем полный парсинг всех страниц.")
+    parse_all_pages_reverse(driver)
+
+    # Список потоков
+    threads = []
+
+    # Создаём потоки
+    clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
+                          name="ClearFormThread")
+
+    # Запускаем потоки
+    threads.append(clear_thread)
+    clear_thread.start()
+
+    # Мониторим потоки
+    monitor_thread = Thread(target=monitor_threads, args=(threads, restart_queue), daemon=True, name="MonitorThread")
+    monitor_thread.start()
+
     while True:
         try:
             # Проверка, нужно ли перезапустить драйвер
             if not is_browser_alive(driver):
                 logger.warning("Браузер перестал отвечать. Перезапуск...")
                 driver = restart_driver(driver)
+
+            # Проверка, нужно ли перезапустить драйвер
+            if not restart_queue.empty():
+                restart_signal = restart_queue.get()
+                if restart_signal:
+                    logger.info("Перезапуск сессии WebDriver.")
+                    driver = restart_driver(driver)
 
             # Получаем новые сообщения
             new_messages = fetch_and_parse_first_page(driver)
@@ -60,27 +114,12 @@ def main():
                 time.sleep(0.5)
                 continue
 
-            link = new_messages["сообщение_ссылка"]
             try:
-                # # Парсим содержимое сообщения
-                # message_content = parse_message_page(link, driver)
-                # new_messages['message_content'] = message_content
-                #
-                # # Подготовка данных перед вставкой в БД
-                # prepared_data = prepare_data_for_db(new_messages)
-                # logger.info(f'Сырые сообщения: %s' , str(prepared_data))
-                #
-                # # добавление новых АУ и должников
-                # au_debtorsDetecting(prepared_data)
-                #
-                # # Вставляем данные в БД и получаем ID
-                # insert_message_to_db(prepared_data)
-                #
-                # # Форматируем данные
-                # formatted_data = split_columns(prepared_data)
-                #
-                # # Проверяем отформатированные данные
-                # lots_analyze(formatted_data)
+                # Парсим содержимое сообщения
+                parsed_data = parse_message_page(new_messages, driver)
+                prepered_data = prepare_data_for_db(parsed_data)
+
+
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке сообщения: {e}")
