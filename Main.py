@@ -10,7 +10,8 @@ from DBmanager import prepare_data_for_db, before_check
 from logScript import logger
 from queue import Queue
 
-from monitoring import clear_form_periodically, fetch_and_parse_first_page, parse_all_pages_reverse
+from monitoring import clear_form_periodically, fetch_and_parse_first_page, parse_all_pages_reverse, \
+    selecting_message_type
 from pars_messageInfo import parse_message_page
 
 # Конфигурация Chrome
@@ -66,7 +67,6 @@ def is_browser_alive(driver):
         logger.warning(f"Браузер не отвечает: {e}")
         return False
 
-
 # Основной цикл программы
 def main():
     driver = create_driver()  # Инициализация WebDriver
@@ -76,6 +76,7 @@ def main():
 
     # Обход всех страниц при старте
     logger.info("Запускаем полный парсинг всех страниц.")
+    driver = selecting_message_type(driver)
     parse_all_pages_reverse(driver)
 
     # Список потоков
@@ -123,8 +124,6 @@ def main():
 
                 # метод для проверки статуса и отправки в базу данных
                 before_check(driver, prepered_data)
-
-
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке сообщения: {e}")

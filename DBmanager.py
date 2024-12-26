@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 import os
 import time
@@ -6,7 +7,7 @@ from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import OperationalError
 
-from search_judgment_act import search_with_pagination
+from search_judgment_act import search_with_pagination, search_act
 
 load_dotenv(dotenv_path='.env')
 
@@ -57,74 +58,85 @@ def clean_text(text):
     text = " ".join(text.split())
     return text
 
+# извлечение ИНН из фио
+def extract_inn(text):
+    match = re.search(r'ИНН[:\s]*(\d+)', str(text))
+    return match.group(1) if match else None
+
 # Функция для подготовки данных для вставки в базу данных
 def prepare_data_for_db(raw_data):
     """Приводит данные к нужному формату для вставки в базу данных"""
+    try:
 
-    # Общие данные для всех сообщений
-    data = raw_data.get('дата', '')
-    date = datetime.strptime(data, "%d.%m.%Y %H:%M:%S") if data else None
-    debtor = clean_text(raw_data.get('должник', ''))
-    debtor_link = raw_data.get('должник_ссылка', '')
-    arbiter = clean_text(raw_data.get('арбитр', ''))
-    arbiter_link = raw_data.get('арбитр_ссылка', '')
-    message_link = raw_data.get('сообщение_ссылка', '')
+        # Общие данные для всех сообщений
+        data = raw_data.get('дата', '')
+        date = datetime.strptime(data, "%d.%m.%Y %H:%M:%S") if data else None
+        debtor = clean_text(raw_data.get('должник', ''))
+        debtor_link = raw_data.get('должник_ссылка', '')
+        arbiter = clean_text(raw_data.get('арбитр', ''))
+        arbiter_link = raw_data.get('арбитр_ссылка', '')
+        message_link = raw_data.get('сообщение_ссылка', '')
 
-    # Данные из содержимого сообщения
-    judgment_act = clean_text(raw_data.get('Судебный акт', ''))
-
-    # Данные о должнике
-    debtor_name = clean_text(raw_data.get('Наименование должника', '') or raw_data.get('ФИО должника', ''))
-    address = clean_text(raw_data.get('Адрес', ''))
-    ogrn = clean_text(raw_data.get('ОГРН', ''))
-    inn = clean_text(raw_data.get('ИНН', ''))
-    case_number = clean_text(raw_data.get('№ дела', ''))
-    birth_date = raw_data.get('Дата рождения', '')
-    birth_place = clean_text(raw_data.get('Место рождения', ''))
-    residence = clean_text(raw_data.get('Место жительства', ''))
-    snils = clean_text(raw_data.get('СНИЛС', ''))
-
-    # Данные об арбитраже
-    arbiter_name = clean_text(raw_data.get('Арбитражный управляющий', ''))
-    correspondence_address = clean_text(raw_data.get('Адрес для корреспонденции', ''))
-    email = clean_text(raw_data.get('E-mail', ''))
-    sro_au = clean_text(raw_data.get('СРО АУ', ''))
-    sro_address = clean_text(raw_data.get('Адрес СРО АУ', ''))
-
-    text = clean_text(raw_data.get('текст', ''))
-    files_link = raw_data.get('файлы', '')
+        # Данные из содержимого сообщения
+        judgment_act = clean_text(raw_data.get('Судебный акт', ''))
 
 
-    # Подготовленные данные для вставки
-    prepared_data = {
-        'дата': date,
-        'должник': debtor,
-        'должник_ссылка': debtor_link,
-        'арбитр': arbiter,
-        'арбитр_ссылка': arbiter_link,
-        'сообщение_ссылка': message_link,
+        # Данные о должнике
+        debtor_name = clean_text(raw_data.get('Наименование должника', '') or raw_data.get('ФИО должника', ''))
+        address = clean_text(raw_data.get('Адрес', ''))
+        ogrn = clean_text(raw_data.get('ОГРН', ''))
+        inn = clean_text(raw_data.get('ИНН', ''))
+        case_number = clean_text(raw_data.get('№ дела', ''))
+        birth_date = raw_data.get('Дата рождения', '')
+        birth_place = clean_text(raw_data.get('Место рождения', ''))
+        residence = clean_text(raw_data.get('Место жительства', ''))
+        snils = clean_text(raw_data.get('СНИЛС', ''))
 
-        'cудебный_акт': judgment_act,
-        'наименование_должника': debtor_name,
-        'адрес ': address,
-        'ОГРН': ogrn,
-        'ИНН': inn,
-        'номер_дела': case_number,
-        'дата_рождения': birth_date,
-        'место_рождения': birth_place,
-        'место_жительства': residence,
-        'СНИЛС': snils,
+        # Данные об арбитраже
+        arbiter_name = clean_text(raw_data.get('Арбитражный управляющий', ''))
+        arbitr_inn = extract_inn(arbiter_name)
+        correspondence_address = clean_text(raw_data.get('Адрес для корреспонденции', ''))
+        email = clean_text(raw_data.get('E-mail', ''))
+        sro_au = clean_text(raw_data.get('СРО АУ', ''))
+        sro_address = clean_text(raw_data.get('Адрес СРО АУ', ''))
 
-        'ФИО_АУ': arbiter_name,
-        'адрес_корреспонденции': correspondence_address,
-        'почта': email,
-        'СРО_АУ': sro_au,
-        'адрес_СРО_АУ': sro_address,
-        'текст': text,
-        'ссылка_файл': files_link
-    }
+        text = clean_text(raw_data.get('текст', ''))
+        files_link = raw_data.get('файлы', '')
 
-    return prepared_data
+
+        # Подготовленные данные для вставки
+        prepared_data = {
+            'дата': date,
+            'должник': debtor,
+            'должник_ссылка': debtor_link,
+            'арбитр': arbiter,
+            'арбитр_ссылка': arbiter_link,
+            'сообщение_ссылка': message_link,
+
+            'cудебный_акт': judgment_act,
+            'наименование_должника': debtor_name,
+            'адрес ': address,
+            'ОГРН': ogrn,
+            'ИНН': inn,
+            'номер_дела': case_number,
+            'дата_рождения': birth_date,
+            'место_рождения': birth_place,
+            'место_жительства': residence,
+            'СНИЛС': snils,
+
+            'ФИО_АУ': arbiter_name,
+            'АУ_инн': arbitr_inn,
+            'адрес_корреспонденции': correspondence_address,
+            'почта': email,
+            'СРО_АУ': sro_au,
+            'адрес_СРО_АУ': sro_address,
+            'текст': text,
+            'ссылка_файл': files_link
+        }
+
+        return prepared_data
+    except Exception as e:
+        logger.error(f'ошибка в методе prepare_data_for_db: {e}')
 
 # отправка данных для обновления статуса в базы данных OurCRM и default_db
 def status_updating(data):
@@ -144,15 +156,25 @@ def status_updating(data):
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             '''
         values_crm = (
-            data['дата'], data['должник'],
-            data["должник_ссылка"], data["сообщение_ссылка"],
-            data["cудебный_акт"],
-            data["наименование_должника"], data["адрес"], data["ОГРН"],
-            data["ИНН"], data["номер_дела"], data["дата_рождения"], data['место_рождения'],
-            data['место_жительства'], data['СНИЛС'], data['текст'], data['ссылка_файл']
+            data.get('дата'),
+            data.get('должник'),
+            data.get("должник_ссылка"),
+            data.get("сообщение_ссылка"),
+            data.get("cудебный_акт"),
+            data.get("наименование_должника"),
+            data.get("адрес"),
+            data.get("ОГРН"),
+            data.get("ИНН"),
+            data.get("номер_дела"),
+            data.get("дата_рождения"),
+            data.get("место_рождения"),
+            data.get("место_жительства"),
+            data.get("СНИЛС"),
+            data.get("текст"),
+            data.get("ссылка_файл")
         )
         cursor_crm.execute(query_crm, values_crm)
-
+        logger.info('отправил данные в срм')
 
         # SQL-запрос для вставки данных
         query_default = '''
@@ -162,10 +184,11 @@ def status_updating(data):
             '''
 
         values_default = (
-            data['cудебный_акт'], data['ИНН']
+            data.get('cудебный_акт'), data.get('ИНН')
         )
         # Выполняем запрос с передачей данных из словаря
         cursor_default.execute(query_default, values_default)
+        logger.info('отправил данные в наш базу')
 
         # Фиксируем изменения
         conn_crm.commit()
@@ -202,19 +225,20 @@ def status_au_updating(data):
 
         query_crm = '''
             INSERT INTO debtor_status_newau (
-                дата, должник, должник_ссылка, сообщение_ссылка, арбитр_ссылка ,текущий_статус,   
+                дата, должник, должник_ссылка, сообщение_ссылка, арбитр, арбитр_ссылка ,текущий_статус,   
                 наименование_должника, адрес, ОГРН, ИНН, номер_дела, дата_рождения, место_рождения,
-                место_жительства, СНИЛС, ФИО_АУ, адрес_корреспонденции, почта, СРО_АУ,
+                место_жительства, СНИЛС, ФИО_АУ, АУ_инн, адрес_корреспонденции, почта, СРО_АУ,
                 адрес_СРО_АУ, текст, ссылка_файл
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             '''
         values_crm = (
             data.get('дата'), data.get('должник'),
-            data.get("должник_ссылка"), data.get("сообщение_ссылка"), data.get('арбитр_ссылка'),
-            data.get("cудебный_акт"),
+            data.get("должник_ссылка"), data.get("сообщение_ссылка"), data.get('арбитр'),
+            data.get('арбитр_ссылка'), data.get("cудебный_акт"),
             data.get("наименование_должника"), data.get("адрес"), data.get("ОГРН"),
             data.get("ИНН"), data.get("номер_дела"), data.get("дата_рождения"), data.get('место_рождения'),
-            data.get('место_жительства'), data.get('СНИЛС'), data.get('ФИО_АУ'), data.get('адрес_корреспонденции'),
+            data.get('место_жительства'), data.get('СНИЛС'), data.get('ФИО_АУ'), data.get('АУ_инн'),
+            data.get('адрес_корреспонденции'),
             data.get('почта'), data.get('СРО_АУ'), data.get('адрес_СРО_АУ'),
             data.get('текст'), data.get('ссылка_файл')
         )
@@ -222,16 +246,29 @@ def status_au_updating(data):
 
 
         # SQL-запрос для вставки данных
-        query_default = '''
-            UPDATE dolzhnik 
-            SET текущий_статус = %s, ФИО_АУ = %s, адрес_корреспонденции = %s,
-            почта = %s, СРО_АУ = %s, адрес_СРО_АУ = %s
-            WHERE Инн_Должника = %s
+        query_default_au = '''
+            UPDATE arbitr_managers 
+            SET ФИО_АУ = %s, ссылка_ЕФРСБ = %s ,город_АУ = %s,
+            почта_ау = %s, СРО_АУ = %s
+            WHERE ИНН_АУ = %s
             '''
 
+        values_default_au = (
+            data.get('ФИО_АУ'), data.get('арбитр_ссылка'), data.get('адрес_корреспонденции'),
+            data.get('почта'), data.get('СРО_АУ'), data.get('АУ_инн'),
+        )
+        # Выполняем запрос с передачей данных из словаря
+        cursor_default.execute(query_default_au, values_default_au)
+
+        # SQL-запрос для вставки данных
+        query_default = '''
+                   UPDATE dolzhnik 
+                   SET ИНН_АУ = %s, текущий_статус = %s
+                   WHERE Инн_Должника = %s
+                   '''
+
         values_default = (
-            data.get('cудебный_акт'), data.get('ФИО_АУ'), data.get('адрес_корреспонденции'),
-            data.get('почта'), data.get('СРО_АУ'), data.get('адрес_СРО_АУ'), data.get('ИНН')
+            data.get('АУ_инн'), data.get('cудебный_акт'), data.get('ИНН')
         )
         # Выполняем запрос с передачей данных из словаря
         cursor_default.execute(query_default, values_default)
@@ -261,23 +298,34 @@ def status_au_updating(data):
 
 # проверка статуса должника
 def before_check(driver, data):
-    status = data['Судебный акт']
+    status = data['cудебный_акт']
     debtor_link = data['должник_ссылка']
 
     list_of_status = {'о введении наблюдения', 'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
                       'о признании должника банкротом и открытии конкурсного производства', 'о передаче дела на рассмотрение другого арбитражного суда об утверждении плана реструктуризации долгов гражданина',
                       'о признании должника банкротом и введении реализации имущества гражданина', 'о напременении в отношении гражданина правила об освобождении от исполнения обязательств',
-                      'о завершении реализации имущества гражданина', 'о прекращении производства по делу'}
+                      'о завершении реализации имущества гражданина', 'о прекращении производства по делу',
+                      'о признании гражданина банкротом и введении реализации имущества гражданина'}
 
     changed_au = {'об утверждении арбитражного управляющего'}
 
-    if status in list_of_status:
-        status_updating(data)
-        logger.info('найден соответствущий статус')
+    try:
+        if status in list_of_status:
+            status_updating(data)
+            logger.info('найден соответствущий статус для обновления')
+        elif status in changed_au:
+            logger.info(f'найден новый ау у должника')
+            list_dic = search_with_pagination(driver, debtor_link)
+            founded_messages_list_dic = search_act(driver, list_dic)
+            logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
 
-    if status in changed_au:
-        search_with_pagination(driver, debtor_link)
+            prepered_data = prepare_data_for_db(founded_messages_list_dic)
+            logger.info(f'данные перепарсинные {prepered_data}')
+            if prepered_data:
+                status_au_updating(prepered_data)
+        else:
+            logger.warning('статус не соответствует требованиям')
+    except Exception as e:
+        logger.error(f'Не получилось обработать статус: {e}')
 
-
-
-
+    return

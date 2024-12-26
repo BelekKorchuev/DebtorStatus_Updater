@@ -15,6 +15,7 @@ list_of_status = {'о введении наблюдения',
 
 changed_au = {'об утверждении арбитражного управляющего'}
 
+# парсинг содержимого сообщения
 def parse_message_page(data, driver):
     try:
         url = data['сообщение_ссылка']
@@ -31,9 +32,6 @@ def parse_message_page(data, driver):
         # Получение HTML-кода страницы
         html = driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
-
-        # Словарь для сохранения данных
-        data = {}
 
         # Основная информация
         table_main = soup.find('table', class_='headInfo')
@@ -85,44 +83,6 @@ def parse_message_page(data, driver):
             file_links.append("Нет файлов")
 
         data.update({'файлы': " ".join(file_links)})
-
-        return data
-    except Exception as e:
-        logger.error(f'Не удалось спарсить содержимое сообщения: {e}')
-        return None
-
-
-def search_message_page(data, driver):
-    try:
-        url = data['сообщение_ссылка']
-        logger.info(f'Переход по ссылке: {url}')
-
-        # Переход по ссылке
-        driver.get(url)
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'red_small'))
-        )
-        # Подождем несколько секунд, чтобы страница полностью загрузилась
-        time.sleep(2)
-
-        # Получение HTML-кода страницы
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
-
-        # Словарь для сохранения данных
-        data = {}
-
-        # Основная информация
-        table_main = soup.find('table', class_='headInfo')
-        if table_main:
-            rows = table_main.find_all('tr')
-            for row in rows:
-                cells = row.find_all('td')
-                if len(cells) == 2:
-                    field = cells[0].text.strip()
-                    value = cells[1].text.strip()
-                    data[field] = value
-
 
         return data
     except Exception as e:

@@ -11,22 +11,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from DBmanager import prepare_data_for_db
+from DBmanager import prepare_data_for_db, before_check
 from logScript import logger
 from pars_messageInfo import parse_message_page
 
 # Допустимые типы сообщений
-valid_message_types = {
-    'Сведения о заключении договора купли-продажи',
-    'Сообщение о результатах торгов',
-    'Объявление о проведении торгов',
-    'Отчет оценщика об оценке имущества должника',
-    'Сообщение об изменении объявления о проведении торгов'
-}
+valid_message_types = {'Сообщение о судебном акте'}
 
 # Файл для сохранения идентификаторов проверенных сообщений
 CHECKED_MESSAGES_FILE = "checked_messages.json"
 
+# загрузка списка проверенных сообщений
 def load_checked_messages():
     """
     Загружает очередь из файла JSON. Если файл не существует или повреждён, создаёт новый файл с пустой очередью.
@@ -44,6 +39,7 @@ def load_checked_messages():
         logger.info(f"Файл {CHECKED_MESSAGES_FILE} не найден. Создаём новый.")
         return initialize_checked_messages_file()
 
+# сохранения в список проверенных сообщений
 def save_checked_messages(queue):
     """
     Сохраняет очередь в файл JSON.
@@ -55,6 +51,7 @@ def save_checked_messages(queue):
     except IOError as e:
         logger.error(f"Ошибка при сохранении файла {CHECKED_MESSAGES_FILE}: {e}")
 
+# создания нового списка при ошибке загрузки файла checked_messages.json
 def initialize_checked_messages_file():
     """
     Создаёт новый файл с пустой очередью.
@@ -66,6 +63,7 @@ def initialize_checked_messages_file():
 # Загружаем очередь из файла при старте программы
 checked_messages = load_checked_messages()
 
+# метод для отслеживания времени перезагрузки
 def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
     """
     :param target_hour: Час запуска (по умолчанию 0 - полночь).
@@ -101,23 +99,15 @@ def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
             logger.error(f"Ошибка в функции clear_form_periodically: {e}")
             return False
 
-
+# метод для мониторинга первой страницы
 def fetch_and_parse_first_page(driver):
-    url = "https://old.bankrot.fedresurs.ru/Messages.aspx"
-    logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {url}')
+    logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {driver.current_url}')
 
     try:
+        driver.refresh()
+
         # Открываем страницу
-        driver.get(url)
         time.sleep(1)  # Ждем 1 секунду для загрузки контента
-
-        search_message_type = driver.find_element(By.ID, "ctl00_cphBody_mdsMessageType_tbSelectedText")  # Очищаем поле
-        search_message_type.click()
-        message_type = driver.find_element(By.CLASS_NAME, "rtLI rtFirst")
-        message_type.click()
-
-        search_button = driver.find_element(By.CLASS_NAME, "ctl00_cphBody_ibMessagesSearch")
-        search_button.click()
 
         # Получаем HTML-код страницы
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -170,7 +160,7 @@ def fetch_and_parse_first_page(driver):
                     return new_messages
 
     except Exception as e:
-        logger.error(f'Ошибка при обработке страницы {url}: {e}')
+        logger.error(f'Ошибка при обработке страницы {driver.current_url}: {e}')
 
     return None
 
@@ -179,41 +169,10 @@ def parse_all_pages_reverse(driver):
     """
     Парсинг всех страниц сообщений при запуске программы, начиная с последней страницы.
     """
-    url = "https://old.bankrot.fedresurs.ru/Messages.aspx"
-
     visited_pages = set()  # Отслеживание уже обработанных страниц
 
-    driver.get(url)
-
-    search_message_type = driver.find_element(By.ID, 'ctl00_cphBody_mdsMessageType_tbSelectedText')  # Очищаем поле
-    search_message_type.click()
-
-    time.sleep(5)
-    # # Ожидаем появления выпадающего списка
-    message_type = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_BodyPlaceHolder_tbSearch"]'))
-    )
-    #
-    # # Вводим текст в поле поиска типа сообщений
-    # message_type.send_keys("Сообщение о судебном акте")
-
-    # Вводим текст в поле поиска через JS
-    # message_type = driver.find_element(By.ID, 'ctl00_BodyPlaceHolder_tbSearch')
-    message_type.click()
-    message_type.send_keys("Сообщение о судебном акте")
-
-    # driver.execute_script("arguments[0].value = 'Сообщение о судебном акте';", message_type)
-
-    time.sleep(5)
-    buttom = driver.find_element(By.ID, 'ctl00_BodyPlaceHolder_btnSearch')
-    buttom.click()
-
-    time.sleep(5)
-    search_button = driver.find_element(By.CLASS_NAME, "ctl00_cphBody_ibMessagesSearch")
-    search_button.click()
-
     time.sleep(2)
-    logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {url}')
+    logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {driver.current_url}')
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     time.sleep(5)
@@ -260,7 +219,7 @@ def parse_all_pages_reverse(driver):
             logger.error(f"Ошибка при переходе на страницу {page_number}: {e}")
             continue
 
-        logger.info("Парсинг всех страниц завершен.")
+        # logger.info("Парсинг всех страниц завершен.")
 
         # Помечаем страницу как обработанную
         visited_pages.add(str(page_number))
@@ -273,6 +232,7 @@ def parse_all_pages_reverse(driver):
 
         # Парсим строки
         rows = table.find_all('tr')
+        logger.info('нашел tr')
         for row in reversed(rows):  # Обрабатываем строки с конца
             row_class = row.get('class', [])
             if not row_class or 'row' in row_class:
@@ -310,10 +270,59 @@ def parse_all_pages_reverse(driver):
                         if new_message:
                             try:
                                 parsed_data = parse_message_page(new_message, driver)
+                                logger.info(f'инфа из париснга сообщения {parsed_data}')
+
                                 prepered_data = prepare_data_for_db(parsed_data)
+                                logger.info(f'данные очищенныеф: {prepered_data}')
+
+                                # метод для проверки статуса и отправки в базу данных
+                                before_check(driver, prepered_data)
 
                             except Exception as e:
                                 logger.error(f"Ошибка при обработке сообщения: {e}")
                                 continue
 
     logger.info("Обход всех страниц завершен.")
+
+# метод для выбора судебного акта в списке сообщений
+def selecting_message_type(driver):
+    url = "https://old.bankrot.fedresurs.ru/Messages.aspx"
+
+    driver.get(url)
+
+    search_message_type = driver.find_element(By.ID, 'ctl00_cphBody_mdsMessageType_tbSelectedText')  # Очищаем поле
+    search_message_type.click()
+
+    time.sleep(5)
+
+    form = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "#aspnetForm"))
+    )
+    logger.info('нашел form')
+
+    # Ожидание появления iframe
+    iframe = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, "//iframe[contains(@src, 'MessageTypeSelect')]"))
+    )
+    logger.info('нашел iframe')
+
+    driver.switch_to.frame(iframe)
+    logger.info('переключился на iframe')
+
+    message_type = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_BodyPlaceHolder_MessageTypeTree"]/ul/li[1]/div/span[2]'))
+    )
+    message_type.click()
+    logger.info('кликнул на кнопуку сообщения ')
+
+    driver.switch_to.default_content()
+    logger.info('переключился на основную окошку ')
+
+    time.sleep(5)
+    search_button = driver.find_element(By.ID, "ctl00_cphBody_ibMessagesSearch")
+    search_button.click()
+    logger.info('кликнул на кнопуку поиск в главном окошке ')
+
+    time.sleep(2)
+
+    return driver
