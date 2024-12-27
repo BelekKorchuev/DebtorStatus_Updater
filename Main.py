@@ -16,10 +16,6 @@ from monitoring import clear_form_periodically, fetch_and_parse_first_page, pars
     selecting_message_type
 from pars_messageInfo import parse_message_page
 
-# Конфигурация Chrome
-chrome_options = Options()
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
 
 # создание виртуального дисплея
 def setup_virtual_display():
