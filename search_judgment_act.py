@@ -104,7 +104,7 @@ def search_act(driver, list_dic):
 
 
     except Exception as e:
-        logger.error(f'НЕ удалось спарсить найденный акт у должника {list_dic[0]['должник_ссылка']}: {e}')
+        logger.error(f"НЕ удалось спарсить найденный акт у должника {list_dic[0]['должник_ссылка']}: {e}")
         driver.close()
         driver.switch_to.window(driver.window_handles[-1])
         return

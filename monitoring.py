@@ -103,7 +103,6 @@ def fetch_and_parse_first_page(driver):
     logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {driver.current_url}')
 
     try:
-        driver.refresh()
 
         # Открываем страницу
         time.sleep(1)  # Ждем 1 секунду для загрузки контента
@@ -112,11 +111,14 @@ def fetch_and_parse_first_page(driver):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
 
         table = soup.find('table', class_='bank')
+        if not table:
+            logger.warning(f"Таблица сообщений не найдена на странице ")
 
-        # Находим строки таблицы сообщений
-        table_rows = table.select("tr")
+        # Парсим строки
+        rows = table.find_all('tr')
 
-        for row in reversed(table_rows):
+        logger.info('нашел tr')
+        for row in reversed(rows):
             cells = row.find_all("td")
             if len(cells) < 5:
                 continue
