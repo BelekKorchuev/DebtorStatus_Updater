@@ -316,7 +316,7 @@ def before_check(driver, data):
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
             list_dic = search_with_pagination(driver, debtor_link)
-            founded_messages_list_dic = search_act(driver, list_dic)
+            founded_messages_list_dic = search_act(driver, list_dic, data)
             logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
 
             prepered_data = prepare_data_for_db(founded_messages_list_dic)

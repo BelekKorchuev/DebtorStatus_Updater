@@ -17,8 +17,28 @@ list_of_status = {'о введении наблюдения',
                   'о признании гражданина банкротом и введении реализации имущества гражданина'}
 
 # метод для определения нужного акта для парсига
-def search_act(driver, list_dic):
+def search_act(driver, list_dic, data):
     try:
+
+        # Список ключей, которые нужно извлечь
+        keys_to_extract = ["ФИО_АУ", "адрес_корреспонденции", "почта", "СРО_АУ", "адрес_СРО_АУ", "арбитр", "арбитр_ссылка"]
+
+        # Новый словарь
+        target_dict = {key: data[key] for key in keys_to_extract if key in data}
+
+        # Сопоставление старых и новых названий ключей
+        key_mapping = {
+            "ФИО_АУ": "Арбитражный управляющий",
+            "адрес_корреспонденции": "Адрес для корреспонденции",
+            "почта": "E-mail",
+            "СРО_АУ": "СРО АУ",
+            "адрес_СРО_АУ": "Адрес СРО АУ"
+        }
+
+        # Переименование ключей
+        renamed_data = {key_mapping.get(k, k): v for k, v in target_dict.items()}
+        logger.info(f'словарь с переименованными ключами: {renamed_data}')
+
         for dic in list_dic:
             # Открытие новой вкладки
             driver.switch_to.window(driver.window_handles[-1])
@@ -56,18 +76,6 @@ def search_act(driver, list_dic):
                             value = cells[1].text.strip()
                             dic[field] = value
 
-            # Информация об арбитражном управляющем
-            arbiter_section = soup.find('div', string="Кем опубликовано")
-            if arbiter_section:
-                arbiter_table = arbiter_section.find_next('table')
-                if arbiter_table:
-                    arbiter_rows = arbiter_table.find_all('tr')
-                    for row in arbiter_rows:
-                        cells = row.find_all('td')
-                        if len(cells) == 2:
-                            field = cells[0].text.strip()
-                            value = cells[1].text.strip()
-                            dic[field] = value
 
             text_section = soup.find_all('div', class_='msg')
             dic['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
@@ -95,13 +103,14 @@ def search_act(driver, list_dic):
             dic['должник'] = dic.get('ФИО должника') or dic.get('Наименование должника')
             logger.info(f'НУЖНЫЙ акт')
 
+            dic.update(renamed_data)
+
             # Закрытие текущей вкладки
             if len(driver.window_handles) > 1:
                 driver.close()
                 driver.switch_to.window(driver.window_handles[-1])  # Переключаемся на последнюю вкладку
 
             return dic
-
 
     except Exception as e:
         logger.error(f"НЕ удалось спарсить найденный акт у должника {list_dic[0]['должник_ссылка']}: {e}")
