@@ -40,20 +40,20 @@ def create_webdriver_with_display():
     """
     try:
         # Настройка виртуального дисплея
-        # xvfb_process = setup_virtual_display()
-        # if not xvfb_process:
-        #     raise RuntimeError("Не удалось настроить виртуальный дисплей.")
+        xvfb_process = setup_virtual_display()
+        if not xvfb_process:
+            raise RuntimeError("Не удалось настроить виртуальный дисплей.")
 
         # Настройка WebDriver
         chrome_options = Options()
-        # chrome_options.add_argument("--no-sandbox")
-        # chrome_options.add_argument("--disable-dev-shm-usage")
-        # chrome_options.add_argument("--disable-gpu")
-        # chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-extensions")
         chrome_service = Service(ChromeDriverManager().install())
 
         driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-        # driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
+        driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
         return driver
     except Exception as e:
         logger.error(f"Ошибка при создании WebDriver: {e}")
@@ -122,7 +122,7 @@ def main():
     # Обход всех страниц при старте
     logger.info("Запускаем полный парсинг всех страниц.")
     driver = selecting_message_type(driver)
-    # parse_all_pages_reverse(driver)
+    parse_all_pages_reverse(driver)
 
     # Список потоков
     threads = []
@@ -165,6 +165,10 @@ def main():
             try:
                 # Парсим содержимое сообщения
                 parsed_data = parse_message_page(new_messages, driver)
+                if parsed_data is None:
+                    driver = restart_driver(driver)  # Перезапустите WebDriver
+                    parsed_data = parse_message_page(new_messages, driver)
+
                 prepered_data = prepare_data_for_db(parsed_data)
 
                 # метод для проверки статуса и отправки в базу данных
