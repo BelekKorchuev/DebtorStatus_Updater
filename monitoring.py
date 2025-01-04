@@ -277,7 +277,7 @@ def parse_all_pages_reverse(driver):
                                 # метод для проверки статуса и отправки в базу данных
                                 check_point = before_check(driver, prepared_data)
                                 if check_point is None:
-                                    logger.warning(f'Какая та ошибка в методе before_check: {new_message.get('должник_ссылка')}')
+                                    logger.warning(f'Какая та ошибка в методе before_check: {new_message.get("должник_ссылка")}')
                                     continue
 
                             except Exception as e:
