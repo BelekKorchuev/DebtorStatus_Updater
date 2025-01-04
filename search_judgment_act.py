@@ -39,6 +39,67 @@ def search_act(driver, list_dic, data):
         renamed_data = {key_mapping.get(k, k): v for k, v in target_dict.items()}
         logger.info(f'словарь с переименованными ключами: {renamed_data}')
 
+        if len(list_dic) == 1:
+            for dic in list_dic:
+                # Открытие новой вкладки
+                driver.switch_to.window(driver.window_handles[-1])
+
+                link = dic.get('сообщение_ссылка', '')
+
+                driver.get(link)
+                logger.info(f'текущее сообщение: {link}')
+
+                # Получение HTML-кода страницы
+                html = driver.page_source
+                soup = BeautifulSoup(html, 'html.parser')
+
+                # Основная информация
+                table_main = soup.find('table', class_='headInfo')
+                if table_main:
+                    rows = table_main.find_all('tr')
+                    for row in rows:
+                        cells = row.find_all('td')
+                        if len(cells) == 2:
+                            field = cells[0].text.strip()
+                            value = cells[1].text.strip()
+                            dic[field] = value
+
+                    # Данные о должнике
+                debtor_section = soup.find('div', string="Должник")
+                if debtor_section:
+                    debtor_table = debtor_section.find_next('table')
+                    if debtor_table:
+                        debtor_rows = debtor_table.find_all('tr')
+                        for row in debtor_rows:
+                            cells = row.find_all('td')
+                            if len(cells) == 2:
+                                field = cells[0].text.strip()
+                                value = cells[1].text.strip()
+                                dic[field] = value
+
+                text_section = soup.find_all('div', class_='msg')
+                dic['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
+
+                file_links = []
+                pinned_files = soup.find_all('a', class_='Reference')
+                if pinned_files:
+                    for file in pinned_files:
+                        file_link = file['href'].replace("&amp;", "&")
+                        file_links.append(f'https://old.bankrot.fedresurs.ru/{file_link}')
+                else:
+                    file_links.append("Нет файлов")
+
+                dic['файлы'] = "&&& ".join(file_links)
+
+                act_status = dic.get('Судебный акт', '')
+
+                dic['должник'] = dic.get('ФИО должника') or dic.get('Наименование должника')
+                logger.info(f'НУЖНЫЙ акт')
+
+                dic.update(renamed_data)
+
+                return dic
+
         for dic in list_dic:
             # Открытие новой вкладки
             driver.switch_to.window(driver.window_handles[-1])
@@ -105,18 +166,11 @@ def search_act(driver, list_dic, data):
 
             dic.update(renamed_data)
 
-            # Закрытие текущей вкладки
-            if len(driver.window_handles) > 1:
-                driver.close()
-                driver.switch_to.window(driver.window_handles[-1])  # Переключаемся на последнюю вкладку
-
             return dic
 
     except Exception as e:
         logger.error(f"НЕ удалось спарсить найденный акт у должника {list_dic[0]['должник_ссылка']}: {e}")
-        driver.close()
-        driver.switch_to.window(driver.window_handles[-1])
-        return
+        return None
 
 # поиск 5 актов или имеющихся актов(из меньше 5)
 def search_with_pagination(driver, link_debtor):
@@ -126,7 +180,7 @@ def search_with_pagination(driver, link_debtor):
     logger.info('началась поиск всех актов у должника')
 
     # Открываем новую вкладку
-    driver.execute_script("window.open('');")
+    # driver.execute_script("window.open('');")
     new_tab = driver.window_handles[-1]  # Получаем хендл новой вкладки
     driver.switch_to.window(new_tab)  # Переключаемся на новую вкладку
 
@@ -154,13 +208,22 @@ def search_with_pagination(driver, link_debtor):
                 if not row_class or 'row' in row_class:
                     # Если это строка с данными сообщения
                     cells = row.find_all('td')
-                    if len(cells) >= 4:
+                    if len(cells) == 4:
                         # Извлекаем данные из ячеек
                         date = cells[0].get_text(strip=True)
                         message_title = cells[1].get_text(strip=True)
                         tag = cells[1].find('a')
-                        raw_link = tag['onclick'].split("'")[1]
-                        link = f"https://old.bankrot.fedresurs.ru{raw_link}"
+                        if tag:
+                            try:
+                                raw_link = tag['onclick'].split("'")[1]
+                            except Exception as e:
+                                raw_link = tag['href']
+
+                            link = f"https://old.bankrot.fedresurs.ru{raw_link}"
+
+                        if "javascript:__doPostBa" in link:
+                            logger.info(f'это ссылка пагинации')
+                            continue
 
                         link_arbitr = cells[2].find("a")["href"] if cells[2].find("a") else None
                         published_by = cells[2].get_text(strip=True)
@@ -171,7 +234,7 @@ def search_with_pagination(driver, link_debtor):
 
                         checked_messages.add(link)
                         logger.info(message_title)
-                        if tag and 'onclick' in tag.attrs:  # Безопасная проверка наличия атрибута
+                        if link:
                             logger.info(f"Ссылка на сообщение: {link}")
                             if "Сообщение о судебном акте" in message_title:
                                 logger.info(f'нашел {message_title}')
@@ -203,8 +266,14 @@ def search_with_pagination(driver, link_debtor):
                     for page_element in page_elements:
 
                         href = page_element['href']
+                        logger.info(f'ссылка погинации {href}')
                         page_action = href.split("'")[3]  # Получаем 'Page$31'
                         logger.info(f"Обнаружено действие: {page_action}")
+
+                        if page_action == 'Page$1':
+                            logger.info('уже проверял первую страницу')
+                            visited_pages.add(page_action)
+                            continue
 
                         if page_action in visited_pages:
                             logger.info(f"Страница {page_action} уже обработана, пропускаем")

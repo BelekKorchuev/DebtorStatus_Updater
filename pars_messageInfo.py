@@ -21,8 +21,14 @@ def parse_message_page(data, driver):
         url = data['сообщение_ссылка']
         logger.info(f'Переход по ссылке: {url}')
 
+        # Открываем новую вкладку
+        driver.execute_script(f"window.open('{url}');")
+        new_tab = driver.window_handles[-1]  # Получаем хендл новой вкладки
+        driver.switch_to.window(new_tab)  # Переключаемся на новую вкладку
+
+
         # Переход по ссылке
-        driver.get(url)
+        # driver.get(url)
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CLASS_NAME, 'red_small'))
         )

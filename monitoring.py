@@ -160,10 +160,10 @@ def fetch_and_parse_first_page(driver):
 
                     return new_messages
 
+        return None
     except Exception as e:
         logger.error(f'Ошибка при обработке страницы {driver.current_url}: {e}')
-
-    return None
+        return None
 
 # парсинг всех страниц снизу верх
 def parse_all_pages_reverse(driver):
@@ -178,15 +178,15 @@ def parse_all_pages_reverse(driver):
 
     time.sleep(5)
 
-    brige_page = "..."
+    bridge_page = "..."
 
     # Находим все ссылки пагинации
-    page_link = soup.find('a', href=True, string=str(brige_page))
+    page_link = soup.find('a', href=True, string=str(bridge_page))
     if not page_link:
         logger.warning("Ссылки пагинации отсутствуют.")
         return
 
-    driver.find_element(By.LINK_TEXT, brige_page).click()
+    driver.find_element(By.LINK_TEXT, bridge_page).click()
 
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.TAG_NAME, 'html'))
@@ -197,8 +197,8 @@ def parse_all_pages_reverse(driver):
                     '...', '9', '8', '7', '6', '5', '4', '3', '2', '1']
 
     for page_number in page_numbers:
-        urlll = "https://old.bankrot.fedresurs.ru/Messages.aspx"
-        driver.get(urlll)
+        # urlll = "https://old.bankrot.fedresurs.ru/Messages.aspx"
+        # driver.get(urlll)
 
         logger.info(f"Переход на страницу: {page_number}")
         try:
@@ -220,10 +220,8 @@ def parse_all_pages_reverse(driver):
             logger.error(f"Ошибка при переходе на страницу {page_number}: {e}")
             continue
 
-        # logger.info("Парсинг всех страниц завершен.")
-
         # Помечаем страницу как обработанную
-        visited_pages.add(str(page_number))
+        visited_pages.add(page_number)
 
         # Обновляем содержимое страницы
         table = soup.find('table', class_='bank')
@@ -273,11 +271,14 @@ def parse_all_pages_reverse(driver):
                                 parsed_data = parse_message_page(new_message, driver)
                                 logger.info(f'инфа из париснга сообщения {parsed_data}')
 
-                                prepered_data = prepare_data_for_db(parsed_data)
-                                logger.info(f'данные очищенныеф: {prepered_data}')
+                                prepared_data = prepare_data_for_db(parsed_data)
+                                logger.info(f'данные очищенныеф: {prepared_data}')
 
                                 # метод для проверки статуса и отправки в базу данных
-                                before_check(driver, prepered_data)
+                                check_point = before_check(driver, prepared_data)
+                                if check_point is None:
+                                    logger.warning(f'Какая та ошибка в методе before_check: {new_message.get('должник_ссылка')}')
+                                    continue
 
                             except Exception as e:
                                 logger.error(f"Ошибка при обработке сообщения: {e}")

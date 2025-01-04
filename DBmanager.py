@@ -313,19 +313,36 @@ def before_check(driver, data):
         if status in list_of_status:
             status_updating(data)
             logger.info('найден соответствущий статус для обновления')
+
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
             list_dic = search_with_pagination(driver, debtor_link)
             founded_messages_list_dic = search_act(driver, list_dic, data)
             logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
+            if founded_messages_list_dic is None:
+                logger.warning(f'НЕ удалось спарсить найденный акт в search_act: {data.get('должник_ссылка')}')
+                return
 
-            prepered_data = prepare_data_for_db(founded_messages_list_dic)
-            logger.info(f'данные перепарсинные {prepered_data}')
-            if prepered_data:
-                status_au_updating(prepered_data)
+            prepared_data = prepare_data_for_db(founded_messages_list_dic)
+            logger.info(f'данные перепарсинные {prepared_data}')
+            if prepared_data:
+                status_au_updating(prepared_data)
         else:
             logger.warning('статус не соответствует требованиям')
+
+        # Закрытие текущей вкладки
+        if len(driver.window_handles) == 2:
+            driver.close()
+            driver.switch_to.window(driver.window_handles[0])  # Переключаемся на последнюю вкладку
+        elif len(driver.window_handles) > 2:
+            for handle in driver.window_handles[1:][::-1]:
+                driver.switch_to.window(handle)
+                driver.close()
+            driver.switch_to.window(driver.window_handles[0])
+
+        return True
     except Exception as e:
         logger.error(f'Не получилось обработать статус: {e}')
-
-    return
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+        return None

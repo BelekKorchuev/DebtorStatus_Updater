@@ -39,21 +39,21 @@ def create_webdriver_with_display():
     Создает WebDriver с виртуальным дисплеем.
     """
     try:
-        # Настройка виртуального дисплея
-        xvfb_process = setup_virtual_display()
-        if not xvfb_process:
-            raise RuntimeError("Не удалось настроить виртуальный дисплей.")
+        # # Настройка виртуального дисплея
+        # xvfb_process = setup_virtual_display()
+        # if not xvfb_process:
+        #     raise RuntimeError("Не удалось настроить виртуальный дисплей.")
 
         # Настройка WebDriver
         chrome_options = Options()
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-extensions")
+        # chrome_options.add_argument("--no-sandbox")
+        # chrome_options.add_argument("--disable-dev-shm-usage")
+        # chrome_options.add_argument("--disable-gpu")
+        # chrome_options.add_argument("--disable-extensions")
         chrome_service = Service(ChromeDriverManager().install())
 
         driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-        driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
+        # driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
         return driver
     except Exception as e:
         logger.error(f"Ошибка при создании WebDriver: {e}")
@@ -158,21 +158,23 @@ def main():
             # Получаем новые сообщения
             new_messages = fetch_and_parse_first_page(driver)
             if new_messages is None:
-                print("Новых сообщений нет, продолжаем проверку...\n\n")
+                logger.warning("Новых сообщений нет, продолжаем проверку...\n\n")
                 time.sleep(0.5)
                 continue
 
             try:
                 # Парсим содержимое сообщения
                 parsed_data = parse_message_page(new_messages, driver)
-                if parsed_data is None:
-                    driver = restart_driver(driver)  # Перезапустите WebDriver
-                    parsed_data = parse_message_page(new_messages, driver)
+                logger.info(f'инфа из париснга сообщения {parsed_data}')
 
-                prepered_data = prepare_data_for_db(parsed_data)
+                prepared_data = prepare_data_for_db(parsed_data)
+                logger.info(f'данные очищенныеф: {prepared_data}')
 
                 # метод для проверки статуса и отправки в базу данных
-                before_check(driver, prepered_data)
+                check_point = before_check(driver, prepared_data)
+                if check_point is None:
+                    logger.warning(f'Какая та ошибка в методе before_check: {prepared_data.get('должник_ссылка')}')
+                    continue
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке сообщения: {e}")
