@@ -141,7 +141,7 @@ def main():
 
     while True:
         try:
-            driver = selecting_message_type(driver)
+            driver.refresh()
 
             # Проверка, нужно ли перезапустить драйвер
             if not is_browser_alive(driver):
@@ -185,7 +185,7 @@ def main():
             driver = restart_driver(driver)  # Перезапустите WebDriver
 
         time.sleep(0.5)  # Задержка перед следующим циклом
-        print("\n \n Ожидание 0.5 секунды для следующего обновления...")
+        logger.info("Ожидание 0.5 секунды для следующего обновления...\n\n")
 
 if __name__ == "__main__":
     main()
