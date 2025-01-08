@@ -13,6 +13,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from DBmanager import prepare_data_for_db, before_check
 from logScript import logger
 from pars_messageInfo import parse_message_page
+from web_driver import restart_driver
 
 # Допустимые типы сообщений
 valid_message_types = {'Сообщение о судебном акте'}
@@ -98,6 +99,14 @@ def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
             logger.error(f"Ошибка в функции clear_form_periodically: {e}")
             return False
 
+def pop_last_elem():
+    if checked_messages:
+        checked_messages.pop()
+        save_checked_messages(checked_messages)
+        return
+    else:
+        raise IndexError("Очередь пуста, нечего удалять")
+
 # метод для мониторинга первой страницы
 def fetch_and_parse_first_page(driver):
     logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {driver.current_url}')
@@ -170,121 +179,129 @@ def parse_all_pages_reverse(driver):
     """
     Парсинг всех страниц сообщений при запуске программы, начиная с последней страницы.
     """
-    visited_pages = set()  # Отслеживание уже обработанных страниц
+    try:
+        driver = selecting_message_type(driver)
 
-    time.sleep(2)
-    logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {driver.current_url}')
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
+        visited_pages = set()  # Отслеживание уже обработанных страниц
 
-    time.sleep(5)
+        time.sleep(2)
+        logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {driver.current_url}')
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-    bridge_page = "..."
+        time.sleep(5)
 
-    # Находим все ссылки пагинации
-    page_link = soup.find('a', href=True, string=str(bridge_page))
-    if not page_link:
-        logger.warning("Ссылки пагинации отсутствуют.")
-        return
+        bridge_page = "..."
 
-    driver.find_element(By.LINK_TEXT, bridge_page).click()
+        # Находим все ссылки пагинации
+        page_link = soup.find('a', href=True, string=str(bridge_page))
+        if not page_link:
+            logger.warning("Ссылки пагинации отсутствуют.")
+            return
 
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.TAG_NAME, 'html'))
-    )
+        driver.find_element(By.LINK_TEXT, bridge_page).click()
 
-    time.sleep(5)
-    page_numbers = ['20', '19', '18', '17', '16', '15', '14', '13', '12', '11',
-                    '...', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, 'html'))
+        )
 
-    for page_number in page_numbers:
-        # urlll = "https://old.bankrot.fedresurs.ru/Messages.aspx"
-        # driver.get(urlll)
+        time.sleep(5)
+        page_numbers = ['20', '19', '18', '17', '16', '15', '14', '13', '12', '11',
+                        '...', '9', '8', '7', '6', '5', '4', '3', '2', '1']
 
-        logger.info(f"Переход на страницу: {page_number}")
-        try:
-            # Находим ссылку на нужную страницу
-            page_link = driver.find_element(By.LINK_TEXT, page_number)
-            page_link.click()  # Эмулируем клик на элемент
-            logger.info(f"Успешный переход на страницу: {page_number}")
+        for page_number in page_numbers:
+            # urlll = "https://old.bankrot.fedresurs.ru/Messages.aspx"
+            # driver.get(urlll)
 
-            # Ожидание загрузки новой страницы
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, 'html'))
-            )
-            time.sleep(2)
+            logger.info(f"Переход на страницу: {page_number}")
+            try:
+                # Находим ссылку на нужную страницу
+                page_link = driver.find_element(By.LINK_TEXT, page_number)
+                page_link.click()  # Эмулируем клик на элемент
+                logger.info(f"Успешный переход на страницу: {page_number}")
 
-            # Обновляем HTML и выполняем парсинг
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
+                # Ожидание загрузки новой страницы
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.TAG_NAME, 'html'))
+                )
+                time.sleep(2)
 
-        except Exception as e:
-            logger.error(f"Ошибка при переходе на страницу {page_number}: {e}")
-            continue
+                # Обновляем HTML и выполняем парсинг
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-        # Помечаем страницу как обработанную
-        visited_pages.add(page_number)
+            except Exception as e:
+                logger.error(f"Ошибка при переходе на страницу {page_number}: {e}")
 
-        # Обновляем содержимое страницы
-        table = soup.find('table', class_='bank')
-        if not table:
-            logger.warning(f"Таблица сообщений не найдена на странице {page_number}")
-            continue
+                continue
 
-        # Парсим строки
-        rows = table.find_all('tr')
-        logger.info('нашел tr')
-        for row in reversed(rows):  # Обрабатываем строки с конца
-            row_class = row.get('class', [])
-            if not row_class or 'row' in row_class:
-                cells = row.find_all("td")
-                if len(cells) < 5:
-                    continue
+            # Помечаем страницу как обработанную
+            visited_pages.add(page_number)
 
-                # Извлекаем данные из ячеек
-                date = cells[0].get_text(strip=True)
-                message_type = cells[1].get_text(strip=True)
-                debtor = cells[2].get_text(strip=True)
-                published_by = cells[4].get_text(strip=True)
-                link_messages = cells[1].find("a")["href"] if cells[1].find("a") else None
-                link_arbitr = cells[4].find("a")["href"] if cells[4].find("a") else None
-                link_debtor = cells[2].find("a")["href"] if cells[2].find("a") else None
+            # Обновляем содержимое страницы
+            table = soup.find('table', class_='bank')
+            if not table:
+                logger.warning(f"Таблица сообщений не найдена на странице {page_number}")
+                continue
 
-                if message_type in valid_message_types:
-                    msg_id = hashlib.md5((date + message_type + debtor).encode()).hexdigest()
-                    new_message = {
-                        "дата": date,
-                        "тип_сообщения": message_type,
-                        "должник": debtor,
-                        "должник_ссылка": f"https://old.bankrot.fedresurs.ru{link_debtor}" if link_debtor else "Нет ссылки",
-                        "арбитр": published_by,
-                        "арбитр_ссылка": f"https://old.bankrot.fedresurs.ru{link_arbitr}" if link_arbitr else "Нет ссылки",
-                        "сообщение_ссылка": f"https://old.bankrot.fedresurs.ru{link_messages}" if link_messages else "Нет ссылки",
-                    }
+            # Парсим строки
+            rows = table.find_all('tr')
+            logger.info('нашел tr')
+            for row in reversed(rows):  # Обрабатываем строки с конца
+                row_class = row.get('class', [])
+                if not row_class or 'row' in row_class:
+                    cells = row.find_all("td")
+                    if len(cells) < 5:
+                        continue
 
-                    if msg_id not in checked_messages:
-                        checked_messages.append(msg_id)
-                        logger.info('Найдено новое релевантное сообщение')
-                        logger.debug(
-                            f'Дата: {date}, Тип сообщения: {message_type}, Должник: {debtor}, Кем опубликовано: {published_by}')
-                        save_checked_messages(checked_messages)
-                        if new_message:
-                            try:
-                                parsed_data = parse_message_page(new_message, driver)
-                                logger.info(f'инфа из париснга сообщения {parsed_data}')
+                    # Извлекаем данные из ячеек
+                    date = cells[0].get_text(strip=True)
+                    message_type = cells[1].get_text(strip=True)
+                    debtor = cells[2].get_text(strip=True)
+                    published_by = cells[4].get_text(strip=True)
+                    link_messages = cells[1].find("a")["href"] if cells[1].find("a") else None
+                    link_arbitr = cells[4].find("a")["href"] if cells[4].find("a") else None
+                    link_debtor = cells[2].find("a")["href"] if cells[2].find("a") else None
 
-                                prepared_data = prepare_data_for_db(parsed_data)
-                                logger.info(f'данные очищенныеф: {prepared_data}')
+                    if message_type in valid_message_types:
+                        msg_id = hashlib.md5((date + message_type + debtor).encode()).hexdigest()
+                        new_message = {
+                            "дата": date,
+                            "тип_сообщения": message_type,
+                            "должник": debtor,
+                            "должник_ссылка": f"https://old.bankrot.fedresurs.ru{link_debtor}" if link_debtor else "Нет ссылки",
+                            "арбитр": published_by,
+                            "арбитр_ссылка": f"https://old.bankrot.fedresurs.ru{link_arbitr}" if link_arbitr else "Нет ссылки",
+                            "сообщение_ссылка": f"https://old.bankrot.fedresurs.ru{link_messages}" if link_messages else "Нет ссылки",
+                        }
 
-                                # метод для проверки статуса и отправки в базу данных
-                                check_point = before_check(driver, prepared_data)
-                                if check_point is None:
-                                    logger.warning(f'Какая та ошибка в методе before_check: {new_message.get("должник_ссылка")}')
+                        if msg_id not in checked_messages:
+                            checked_messages.append(msg_id)
+                            logger.info('Найдено новое релевантное сообщение')
+                            logger.debug(
+                                f'Дата: {date}, Тип сообщения: {message_type}, Должник: {debtor}, Кем опубликовано: {published_by}')
+                            save_checked_messages(checked_messages)
+                            if new_message:
+                                try:
+                                    parsed_data = parse_message_page(new_message, driver)
+                                    logger.info(f'инфа из париснга сообщения {parsed_data}')
+
+                                    prepared_data = prepare_data_for_db(parsed_data)
+                                    logger.info(f'данные очищенныеф: {prepared_data}')
+
+                                    # метод для проверки статуса и отправки в базу данных
+                                    check_point = before_check(driver, prepared_data)
+                                    if check_point is None:
+                                        logger.warning(f'Какая та ошибка в методе before_check: {new_message.get("должник_ссылка")}')
+                                        continue
+
+                                except Exception as e:
+                                    logger.error(f"Ошибка при обработке сообщения: {e}")
                                     continue
 
-                            except Exception as e:
-                                logger.error(f"Ошибка при обработке сообщения: {e}")
-                                continue
+        logger.info("Обход всех страниц завершен.")
+    except Exception as e:
+        logger.error(f"Произошла ошибка при обходе всех страниц: {e}")
+        return
 
-    logger.info("Обход всех страниц завершен.")
 
 # метод для выбора судебного акта в списке сообщений
 def selecting_message_type(driver):
