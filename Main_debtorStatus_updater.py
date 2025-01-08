@@ -83,7 +83,7 @@ def main():
                 # Получаем новые сообщения
                 new_messages = fetch_and_parse_first_page(driver)
                 if new_messages is None:
-                    logger.warning("Новых сообщений нет, продолжаем проверку...\n\n")
+                    logger.info("Новых сообщений нет, продолжаем проверку...\n\n")
                     time.sleep(0.5)
                     continue
 

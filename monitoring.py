@@ -126,7 +126,6 @@ def fetch_and_parse_first_page(driver):
         # Парсим строки
         rows = table.find_all('tr')
 
-        logger.info('нашел tr')
         for row in reversed(rows):
             cells = row.find_all("td")
             if len(cells) < 5:
@@ -298,6 +297,7 @@ def parse_all_pages_reverse(driver):
                                     continue
 
         logger.info("Обход всех страниц завершен.")
+        return True
     except Exception as e:
         logger.error(f"Произошла ошибка при обходе всех страниц: {e}")
         return
