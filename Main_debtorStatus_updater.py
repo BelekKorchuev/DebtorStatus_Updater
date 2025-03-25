@@ -42,7 +42,7 @@ def main():
         # Обход всех страниц при старте
         logger.info("Запускаем полный парсинг всех страниц.")
         error_from_pars_all_pages = parse_all_pages_reverse(driver)
-        if error_from_pars_all_pages is None:
+        if error_from_pars_all_pages is False:
             pop_last_elem()
             cleanup_virtual_display(driver)
             driver.quit()
@@ -104,7 +104,7 @@ def main():
                     # метод для проверки статуса и отправки в базу данных
                     check_point = before_check(driver, prepared_data)
                     if check_point is None:
-                        logger.warning(f'Какая та ошибка в методе before_check: {prepared_data.get("должник_ссылка")}')
+                        logger.error(f'Какая та ошибка в методе before_check: {prepared_data.get("должник_ссылка")}')
                         continue
 
                 except Exception as e:

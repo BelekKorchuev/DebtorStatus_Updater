@@ -300,7 +300,7 @@ def parse_all_pages_reverse(driver):
         return True
     except Exception as e:
         logger.error(f"Произошла ошибка при обходе всех страниц: {e}")
-        return
+        return False
 
 
 # метод для выбора судебного акта в списке сообщений

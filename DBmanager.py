@@ -40,7 +40,7 @@ def get_db2_connection():
         connection = psycopg2.connect(
             host=db_host,
             port=db_port,
-            database=db_name2,
+            database=db_name,
             user=db_user,
             password=db_password
         )
@@ -142,57 +142,70 @@ def prepare_data_for_db(raw_data):
 def status_updating(data):
     try:
         conn_crm = get_db2_connection()
-        conn_default = get_db1_connection()
+        # conn_default = get_db1_connection()
 
         # Создаем курсор
         cursor_crm = conn_crm.cursor()
-        cursor_default =conn_default.cursor()
+        # cursor_default =conn_default.cursor()
 
         query_crm = '''
-            INSERT INTO debtor_status_newau (
-                дата, должник, должник_ссылка, сообщение_ссылка, текущий_статус,   
-                наименование_должника, адрес, ОГРН, ИНН, номер_дела, дата_рождения, место_рождения,
-                место_жительства, СНИЛС, текст, ссылка_файл
+            INSERT INTO debtor_status_ourdb (
+                дата,
+                сообщение_ссылка,  
+                должник, 
+                должник_ссылка,
+                Актуальность, 
+                статус,  
+                номер_дела, 
+                текст,
+                Полное_имя,
+                ИНН, 
+                Дата_рождения,
+                Место_рождения,
+                СНИЛС, 
+                Место_жительства,
+                Адрес,
+                ОГРН
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             '''
         values_crm = (
             data.get('дата'),
+            data.get("сообщение_ссылка"),
             data.get('должник'),
             data.get("должник_ссылка"),
-            data.get("сообщение_ссылка"),
+            data.get("актуальность"),
             data.get("cудебный_акт"),
-            data.get("наименование_должника"),
-            data.get("адрес"),
-            data.get("ОГРН"),
-            data.get("ИНН"),
             data.get("номер_дела"),
+            data.get("текст"),
+            data.get("наименование_должника"),
+            data.get("ИНН"),
             data.get("дата_рождения"),
             data.get("место_рождения"),
-            data.get("место_жительства"),
             data.get("СНИЛС"),
-            data.get("текст"),
-            data.get("ссылка_файл")
+            data.get("место_жительства"),
+            data.get("адрес"),
+            data.get("ОГРН"),
         )
         cursor_crm.execute(query_crm, values_crm)
         logger.info('отправил данные в срм')
 
-        # SQL-запрос для вставки данных
-        query_default = '''
-            UPDATE dolzhnik 
-            SET текущий_статус = %s
-            WHERE Инн_Должника = %s
-            '''
-
-        values_default = (
-            data.get('cудебный_акт'), data.get('ИНН')
-        )
-        # Выполняем запрос с передачей данных из словаря
-        cursor_default.execute(query_default, values_default)
-        logger.info('отправил данные в наш базу')
+        # # SQL-запрос для вставки данных
+        # query_default = '''
+        #     UPDATE dolzhnik
+        #     SET текущий_статус = %s
+        #     WHERE Инн_Должника = %s
+        #     '''
+        #
+        # values_default = (
+        #     data.get('cудебный_акт'), data.get('ИНН')
+        # )
+        # # Выполняем запрос с передачей данных из словаря
+        # cursor_default.execute(query_default, values_default)
+        # logger.info('отправил данные в наш базу')
 
         # Фиксируем изменения
         conn_crm.commit()
-        conn_default.commit()
+        # conn_default.commit()
 
 
         logger.info(f"Данные успешно добавлены в базу для {data['ИНН']}")
@@ -201,81 +214,117 @@ def status_updating(data):
         # Фиксируем изменения
         if conn_crm:
             conn_crm.rollback()
-        if conn_default:
-            conn_default.rollback()
+        # if conn_default:
+        #     conn_default.rollback()
     finally:
         if cursor_crm:
             cursor_crm.close()
-        if cursor_default:
-            cursor_default.close()
+        # if cursor_default:
+        #     cursor_default.close()
         if conn_crm:
             conn_crm.close()
-        if conn_default:
-            conn_default.close()
+        # if conn_default:
+        #     conn_default.close()
 
 # отправка данных для обновления статуса и АУ в базы данных OurCRM и default_db
 def status_au_updating(data):
     try:
         conn_crm = get_db2_connection()
-        conn_default = get_db1_connection()
+        # conn_default = get_db1_connection()
 
         # Создаем курсор
         cursor_crm = conn_crm.cursor()
-        cursor_default =conn_default.cursor()
+        # cursor_default =conn_default.cursor()
 
         query_crm = '''
-            INSERT INTO debtor_status_newau (
-                дата, должник, должник_ссылка, сообщение_ссылка, арбитр, арбитр_ссылка ,текущий_статус,   
-                наименование_должника, адрес, ОГРН, ИНН, номер_дела, дата_рождения, место_рождения,
-                место_жительства, СНИЛС, ФИО_АУ, АУ_инн, адрес_корреспонденции, почта, СРО_АУ,
-                адрес_СРО_АУ, текст, ссылка_файл
+            INSERT INTO debtor_status_ourdb (
+                дата,
+                сообщение_ссылка,  
+                должник, 
+                должник_ссылка,
+                Актуальность, 
+                статус,  
+                номер_дела, 
+                текст,
+                файлы,
+                Полное_имя,
+                ИНН, 
+                Дата_рождения,
+                Место_рождения,
+                СНИЛС, 
+                Место_жительства,
+                Адрес,
+                ОГРН,
+                Арбитражный_управляющий, 
+                Адрес_для_корреспонденции,
+                e_mail,
+                СРО_АУ,
+                Адрес_СРО_АУ,
+                арбитр_ссылка,
+                АУ_инн
+                
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             '''
         values_crm = (
-            data.get('дата'), data.get('должник'),
-            data.get("должник_ссылка"), data.get("сообщение_ссылка"), data.get('арбитр'),
-            data.get('арбитр_ссылка'), data.get("cудебный_акт"),
-            data.get("наименование_должника"), data.get("адрес"), data.get("ОГРН"),
-            data.get("ИНН"), data.get("номер_дела"), data.get("дата_рождения"), data.get('место_рождения'),
-            data.get('место_жительства'), data.get('СНИЛС'), data.get('ФИО_АУ'), data.get('АУ_инн'),
+            data.get('дата'),
+            data.get("сообщение_ссылка"),
+            data.get('должник'),
+            data.get("должник_ссылка"),
+            data.get("актуальность"),
+            data.get("cудебный_акт"),
+            data.get("номер_дела"),
+            data.get("текст"),
+            data.get('ссылка_файл'),
+            data.get("наименование_должника"),
+            data.get("ИНН"),
+            data.get("дата_рождения"),
+            data.get("место_рождения"),
+            data.get("СНИЛС"),
+            data.get("место_жительства"),
+            data.get("адрес"),
+            data.get("ОГРН"),
+            data.get('арбитр'),
             data.get('адрес_корреспонденции'),
-            data.get('почта'), data.get('СРО_АУ'), data.get('адрес_СРО_АУ'),
-            data.get('текст'), data.get('ссылка_файл')
+            data.get('почта'),
+            data.get('СРО_АУ'),
+            data.get('адрес_СРО_АУ'),
+            data.get('арбитр_ссылка'),
+            data.get('АУ_инн'),
         )
         cursor_crm.execute(query_crm, values_crm)
 
 
-        # SQL-запрос для вставки данных
-        query_default_au = '''
-            UPDATE arbitr_managers 
-            SET ФИО_АУ = %s, ссылка_ЕФРСБ = %s ,город_АУ = %s,
-            почта_ау = %s, СРО_АУ = %s
-            WHERE ИНН_АУ = %s
-            '''
+        # # SQL-запрос для вставки данных
+        # query_default_au = '''
+        #     UPDATE arbitr_managers
+        #     SET ФИО_АУ = %s, ссылка_ЕФРСБ = %s ,город_АУ = %s,
+        #     почта_ау = %s, СРО_АУ = %s
+        #     WHERE ИНН_АУ = %s
+        #     '''
+        #
+        # values_default_au = (
+        #     data.get('ФИО_АУ'), data.get('арбитр_ссылка'), data.get('адрес_корреспонденции'),
+        #     data.get('почта'), data.get('СРО_АУ'), data.get('АУ_инн'),
+        # )
+        # # Выполняем запрос с передачей данных из словаря
+        # cursor_default.execute(query_default_au, values_default_au)
 
-        values_default_au = (
-            data.get('ФИО_АУ'), data.get('арбитр_ссылка'), data.get('адрес_корреспонденции'),
-            data.get('почта'), data.get('СРО_АУ'), data.get('АУ_инн'),
-        )
-        # Выполняем запрос с передачей данных из словаря
-        cursor_default.execute(query_default_au, values_default_au)
-
-        # SQL-запрос для вставки данных
-        query_default = '''
-                   UPDATE dolzhnik 
-                   SET ИНН_АУ = %s, текущий_статус = %s
-                   WHERE Инн_Должника = %s
-                   '''
-
-        values_default = (
-            data.get('АУ_инн'), data.get('cудебный_акт'), data.get('ИНН')
-        )
-        # Выполняем запрос с передачей данных из словаря
-        cursor_default.execute(query_default, values_default)
+        # # SQL-запрос для вставки данных
+        # query_default = '''
+        #            UPDATE dolzhnik
+        #            SET ИНН_АУ = %s, текущий_статус = %s
+        #            WHERE Инн_Должника = %s
+        #            '''
+        #
+        # values_default = (
+        #     data.get('АУ_инн'), data.get('cудебный_акт'), data.get('ИНН')
+        # )
+        # # Выполняем запрос с передачей данных из словаря
+        # cursor_default.execute(query_default, values_default)
 
         # Фиксируем изменения
         conn_crm.commit()
-        conn_default.commit()
+        # conn_default.commit()
 
 
         logger.info(f"Данные успешно добавлены в базу для {data['ИНН']}")
@@ -284,36 +333,51 @@ def status_au_updating(data):
         # Фиксируем изменения
         if conn_crm:
             conn_crm.rollback()
-        if conn_default:
-            conn_default.rollback()
+        # if conn_default:
+        #     conn_default.rollback()
     finally:
         if cursor_crm:
             cursor_crm.close()
-        if cursor_default:
-            cursor_default.close()
+        # if cursor_default:
+        #     cursor_default.close()
         if conn_crm:
             conn_crm.close()
-        if conn_default:
-            conn_default.close()
+        # if conn_default:
+        #     conn_default.close()
 
 # проверка статуса должника
 def before_check(driver, data):
     status = data['cудебный_акт']
     debtor_link = data['должник_ссылка']
 
-    list_of_status = {'о введении наблюдения', 'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
-                      'о признании должника банкротом и открытии конкурсного производства', 'о передаче дела на рассмотрение другого арбитражного суда об утверждении плана реструктуризации долгов гражданина',
-                      'о признании должника банкротом и введении реализации имущества гражданина', 'о напременении в отношении гражданина правила об освобождении от исполнения обязательств',
-                      'о завершении реализации имущества гражданина', 'о прекращении производства по делу',
-                      'о признании гражданина банкротом и введении реализации имущества гражданина'}
+    list_of_status = {'о введении наблюдения',
+                      'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
+                      'о признании должника банкротом и открытии конкурсного производства',
+                      'о передаче дела на рассмотрение другого арбитражного суда об утверждении плана реструктуризации долгов гражданина',
+                      'о признании должника банкротом и введении реализации имущества гражданина',
+                      'о напременении в отношении гражданина правила об освобождении от исполнения обязательств',
+                      'о признании гражданина банкротом и введении реализации имущества гражданина',
+
+                      }
+    unuctual_status = {'о завершении конкурсного производства',
+                      'о завершении реализации имущества гражданина',
+                      'о прекращении производства по делу',
+                      'определение о прекращении производства по делу',
+                      'определение о завершении реализации имущества гражданина'}
 
     changed_au = {'об утверждении арбитражного управляющего'}
 
     try:
         if status in list_of_status:
+            data['актуальность'] = 'актуален'
             status_updating(data)
-            logger.info('найден соответствущий статус для обновления')
-
+            logger.info('найден статус(Актуален) для обновления\n'
+                        f'данные: {data}')
+        elif status in unuctual_status:
+            data['актуальность'] = 'неактуален'
+            status_updating(data)
+            logger.info('найден статус(неАктуален) для обновления\n'
+                        f'данные: {data}')
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
             list_dic = search_with_pagination(driver, debtor_link)
@@ -324,25 +388,15 @@ def before_check(driver, data):
                 return
 
             prepared_data = prepare_data_for_db(founded_messages_list_dic)
+
             logger.info(f'данные перепарсинные {prepared_data}')
             if prepared_data:
+                prepared_data['актуальность'] = 'актуален'
                 status_au_updating(prepared_data)
         else:
-            logger.warning('статус не соответствует требованиям')
-
-        # Закрытие текущей вкладки
-        if len(driver.window_handles) == 2:
-            driver.close()
-            driver.switch_to.window(driver.window_handles[0])  # Переключаемся на последнюю вкладку
-        elif len(driver.window_handles) > 2:
-            for handle in driver.window_handles[1:][::-1]:
-                driver.switch_to.window(handle)
-                driver.close()
-            driver.switch_to.window(driver.window_handles[0])
+            logger.warning(f'статус не соответствует требованиям: {status}')
 
         return True
     except Exception as e:
         logger.error(f'Не получилось обработать статус: {e}')
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])
         return None

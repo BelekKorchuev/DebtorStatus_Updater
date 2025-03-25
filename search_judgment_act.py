@@ -1,5 +1,6 @@
 import time
 
+import requests
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -42,16 +43,11 @@ def search_act(driver, list_dic, data):
         if len(list_dic) == 1:
             for dic in list_dic:
                 # Открытие новой вкладки
-                driver.switch_to.window(driver.window_handles[-1])
-
                 link = dic.get('сообщение_ссылка', '')
-
-                driver.get(link)
+                response = requests.post(link)
                 logger.info(f'текущее сообщение: {link}')
 
-                # Получение HTML-кода страницы
-                html = driver.page_source
-                soup = BeautifulSoup(html, 'html.parser')
+                soup = BeautifulSoup(response.text, 'html.parser')
 
                 # Основная информация
                 table_main = soup.find('table', class_='headInfo')
@@ -91,7 +87,7 @@ def search_act(driver, list_dic, data):
 
                 dic['файлы'] = "&&& ".join(file_links)
 
-                act_status = dic.get('Судебный акт', '')
+                # act_status = dic.get('Судебный акт', '')
 
                 dic['должник'] = dic.get('ФИО должника') or dic.get('Наименование должника')
                 logger.info(f'НУЖНЫЙ акт')
@@ -101,17 +97,12 @@ def search_act(driver, list_dic, data):
                 return dic
 
         for dic in list_dic:
-            # Открытие новой вкладки
-            driver.switch_to.window(driver.window_handles[-1])
-
             link = dic.get('сообщение_ссылка', '')
 
-            driver.get(link)
+            response = requests.post(link)
             logger.info(f'текущее сообщение: {link}')
 
-            # Получение HTML-кода страницы
-            html = driver.page_source
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(response.text, 'html.parser')
 
             # Основная информация
             table_main = soup.find('table', class_='headInfo')
@@ -141,16 +132,16 @@ def search_act(driver, list_dic, data):
             text_section = soup.find_all('div', class_='msg')
             dic['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
-            file_links = []
-            pinned_files = soup.find_all('a', class_='Reference')
-            if pinned_files:
-                for file in pinned_files:
-                    file_link = file['href'].replace("&amp;", "&")
-                    file_links.append(f'https://old.bankrot.fedresurs.ru/{file_link}')
-            else:
-                file_links.append("Нет файлов")
-
-            dic['файлы'] = "&&& ".join(file_links)
+            # file_links = []
+            # pinned_files = soup.find_all('a', class_='Reference')
+            # if pinned_files:
+            #     for file in pinned_files:
+            #         file_link = file['href'].replace("&amp;", "&")
+            #         file_links.append(f'https://old.bankrot.fedresurs.ru/{file_link}')
+            # else:
+            #     file_links.append("Нет файлов")
+            #
+            # dic['файлы'] = "&&& ".join(file_links)
 
             act_status = dic.get('Судебный акт', '')
             if act_status == "об утверждении арбитражного управляющего":
@@ -180,12 +171,9 @@ def search_with_pagination(driver, link_debtor):
     logger.info('началась поиск всех актов у должника')
 
     # Открываем новую вкладку
-    # driver.execute_script("window.open('');")
-    new_tab = driver.window_handles[-1]  # Получаем хендл новой вкладки
-    driver.switch_to.window(new_tab)  # Переключаемся на новую вкладку
-
-    # Открываем указанный URL в новой вкладке
-    driver.get(link_debtor)
+    driver.execute_script(f"window.open('{link_debtor}');")
+    new_tab = driver.window_handles[-1]
+    driver.switch_to.window(new_tab)
 
     # Получаем HTML-код страницы
     soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -195,7 +183,7 @@ def search_with_pagination(driver, link_debtor):
     visited_pages = set()
     needed_stop = False
     while not needed_stop:
-        if limit == 5:
+        if limit == 10:
             needed_stop = True
 
         table = soup.find('table', class_='bank')
@@ -212,14 +200,9 @@ def search_with_pagination(driver, link_debtor):
                         # Извлекаем данные из ячеек
                         date = cells[0].get_text(strip=True)
                         message_title = cells[1].get_text(strip=True)
-                        tag = cells[1].find('a')
-                        if tag:
-                            try:
-                                raw_link = tag['onclick'].split("'")[1]
-                            except Exception as e:
-                                raw_link = tag['href']
+                        tag = cells[1].find('a')['href'] if cells[1].find("a") else None
 
-                            link = f"https://old.bankrot.fedresurs.ru{raw_link}"
+                        link = f"https://old.bankrot.fedresurs.ru{tag}"
 
                         if "javascript:__doPostBa" in link:
                             logger.info(f'это ссылка пагинации')
@@ -251,69 +234,83 @@ def search_with_pagination(driver, link_debtor):
                                 limit += 1
                                 messages.append(message_face)
 
-                # Если это строка с пагинацией
-                if 'pager' in row_class:
-                    pager_table = row.find_next('table')
-                    if not pager_table:
-                        logger.info("Таблица пагинации не найдена")
-                        return
+            # Если это строка с пагинацией
+            pager_row = table.find('tr', class_='pager')
+            if not pager_row:
+                logger.info("Больше нет страниц для перехода.")
+                break
+            logger.info("Обнаружена таблица пагинации")
 
-                    page_elements = pager_table.find_all('a', href=True)
-                    if not page_elements:
-                        logger.info("Ссылки пагинации отсутствуют")
-                        return
+            pager_table = pager_row.find_next('table')
+            if not pager_table:
+                logger.info("Таблица пагинации не найдена")
+                return
 
-                    for page_element in page_elements:
+            page_elements = pager_table.find_all('a', href=True)
+            if not page_elements:
+                logger.info("Ссылки пагинации отсутствуют")
+                return
 
-                        href = page_element['href']
-                        logger.info(f'ссылка погинации {href}')
-                        page_action = href.split("'")[3]  # Получаем 'Page$31'
-                        logger.info(f"Обнаружено действие: {page_action}")
+            for page_element in page_elements:
 
-                        if page_action == 'Page$1':
-                            logger.info('уже проверял первую страницу')
-                            visited_pages.add(page_action)
-                            continue
+                href = page_element['href']
+                logger.info(f'ссылка погинации {href}')
+                page_action = href.split("'")[3]  # Получаем 'Page$31'
+                logger.info(f"Обнаружено действие: {page_action}")
 
-                        if page_action in visited_pages:
-                            logger.info(f"Страница {page_action} уже обработана, пропускаем")
-                            continue
+                if page_action == 'Page$1':
+                    logger.info('уже проверял первую страницу')
+                    visited_pages.add(page_action)
+                    continue
 
-                        # Проверяем, начинается ли href с нужного JavaScript
-                        if "javascript:__doPostBack" in href:
-                            try:
-                                script = """
-                                    var theForm = document.forms['aspnetForm'];
-                                    if (!theForm) {
-                                        theForm = document.aspnetForm;
-                                    }
-                                    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
-                                        theForm.__EVENTTARGET.value = arguments[0];
-                                        theForm.__EVENTARGUMENT.value = arguments[1];
-                                        theForm.submit();
-                                    }
-                                    """
-                                logger.info(f"Клик по элементу пагинации: {page_action}")
-                                driver.execute_script(script, 'ctl00$cphBody$gvMessages', page_action)
+                if page_action in visited_pages:
+                    logger.info(f"Страница {page_action} уже обработана, пропускаем")
+                    continue
 
-                                # element.click()  # Кликаем по элементу
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.TAG_NAME, 'html'))
-                                )
-                                time.sleep(3)  # Ожидание загрузки новой страницы
+                # Проверяем, начинается ли href с нужного JavaScript
+                if "javascript:__doPostBack" in href:
+                    try:
+                        script = """
+                            var theForm = document.forms['aspnetForm'];
+                            if (!theForm) {
+                                theForm = document.aspnetForm;
+                            }
+                            if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+                                theForm.__EVENTTARGET.value = arguments[0];
+                                theForm.__EVENTARGUMENT.value = arguments[1];
+                                theForm.submit();
+                            }
+                            """
+                        logger.info(f"Клик по элементу пагинации: {page_action}")
+                        driver.execute_script(script, 'ctl00$cphBody$gvMessages', page_action)
 
-                                # Обновляем soup для новой страницы и продолжаем обработку
-                                soup = BeautifulSoup(driver.page_source, 'html.parser')
+                        # element.click()  # Кликаем по элементу
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.TAG_NAME, 'html'))
+                        )
+                        time.sleep(3)  # Ожидание загрузки новой страницы
+
+                        # Обновляем soup для новой страницы и продолжаем обработку
+                        soup = BeautifulSoup(driver.page_source, 'html.parser')
 
 
-                                visited_pages.add(page_action)
-                                break
-                            except Exception as e:
-                                logger.error(f"Ошибка при клике на элемент пагинации: {e}")
-                                return
-                    else:
-                        logger.info("Дополнительных страниц для перехода не найдено")
-                        return
+                        visited_pages.add(page_action)
+                        break
+                    except Exception as e:
+                        logger.error(f"Ошибка при клике на элемент пагинации: {e}")
+
+            else:
+                logger.info("Дополнительных страниц для перехода не найдено")
+
+    # Закрытие текущей вкладки
+    if len(driver.window_handles) == 2:
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])  # Переключаемся на последнюю вкладку
+    elif len(driver.window_handles) > 2:
+        for handle in driver.window_handles[1:][::-1]:
+            driver.switch_to.window(handle)
+            driver.close()
+        driver.switch_to.window(driver.window_handles[0])
 
     logger.info('закончил поиск актов')
     return messages

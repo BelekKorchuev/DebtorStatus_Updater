@@ -4,6 +4,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 import time
 from selenium.webdriver.support import expected_conditions as EC
 from logScript import logger
+import requests
 
 list_of_status = {'о введении наблюдения',
                   'о признании обоснованным заявления о признании гражданина банкротом и введении реструктуризации его долгов',
@@ -18,26 +19,12 @@ changed_au = {'об утверждении арбитражного управл
 # парсинг содержимого сообщения
 def parse_message_page(data, driver):
     try:
+
         url = data['сообщение_ссылка']
+        response = requests.post(url)
         logger.info(f'Переход по ссылке: {url}')
 
-        # Открываем новую вкладку
-        driver.execute_script(f"window.open('{url}');")
-        new_tab = driver.window_handles[-1]  # Получаем хендл новой вкладки
-        driver.switch_to.window(new_tab)  # Переключаемся на новую вкладку
-
-
-        # Переход по ссылке
-        # driver.get(url)
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'red_small'))
-        )
-        # Подождем несколько секунд, чтобы страница полностью загрузилась
-        time.sleep(2)
-
-        # Получение HTML-кода страницы
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(response.text , 'html.parser')
 
         # Основная информация
         table_main = soup.find('table', class_='headInfo')
