@@ -67,6 +67,11 @@ def main():
         while True:
             try:
                 driver.refresh()
+                current_url = driver.current_url
+                if 'https://old.bankrot.fedresurs.ru/cookie-js-info.html' in current_url:
+                    cleanup_virtual_display(driver)
+                    driver.quit()
+                    break
 
                 # Проверка, нужно ли перезапустить драйвер
                 if not is_browser_alive(driver):

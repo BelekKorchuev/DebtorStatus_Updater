@@ -166,7 +166,24 @@ def status_updating(data):
                 Место_жительства,
                 Адрес,
                 ОГРН
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (ИНН)
+            DO UPDATE SET
+                дата = EXCLUDED.дата,
+                сообщение_ссылка = EXCLUDED.сообщение_ссылка,
+                должник = EXCLUDED.должник,
+                должник_ссылка = EXCLUDED.должник_ссылка,
+                Актуальность = EXCLUDED.Актуальность,
+                статус = EXCLUDED.статус,
+                номер_дела = EXCLUDED.номер_дела,
+                текст = EXCLUDED.текст,
+                Полное_имя = EXCLUDED.Полное_имя,
+                Дата_рождения = EXCLUDED.Дата_рождения,
+                Место_рождения = EXCLUDED.Место_рождения,
+                СНИЛС = EXCLUDED.СНИЛС,
+                Место_жительства = EXCLUDED.Место_жительства,
+                Адрес = EXCLUDED.Адрес,
+                ОГРН = EXCLUDED.ОГРН;
             '''
         values_crm = (
             data.get('дата'),
@@ -262,8 +279,31 @@ def status_au_updating(data):
                 Адрес_СРО_АУ,
                 арбитр_ссылка,
                 АУ_инн
-                
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (ИНН) DO UPDATE SET
+                дата = EXCLUDED.дата,
+                сообщение_ссылка = EXCLUDED.сообщение_ссылка,  
+                должник = EXCLUDED.должник, 
+                должник_ссылка = EXCLUDED.должник_ссылка,
+                Актуальность = EXCLUDED.Актуальность, 
+                статус = EXCLUDED.статус,  
+                номер_дела = EXCLUDED.номер_дела, 
+                текст = EXCLUDED.текст,
+                файлы = EXCLUDED.файлы,
+                Полное_имя = EXCLUDED.Полное_имя,
+                Дата_рождения = EXCLUDED.Дата_рождения,
+                Место_рождения = EXCLUDED.Место_рождения,
+                СНИЛС = EXCLUDED.СНИЛС, 
+                Место_жительства = EXCLUDED.Место_жительства,
+                Адрес = EXCLUDED.Адрес,
+                ОГРН = EXCLUDED.ОГРН,
+                Арбитражный_управляющий = EXCLUDED.Арбитражный_управляющий, 
+                Адрес_для_корреспонденции = EXCLUDED.Адрес_для_корреспонденции,
+                e_mail = EXCLUDED.e_mail,
+                СРО_АУ = EXCLUDED.СРО_АУ,
+                Адрес_СРО_АУ = EXCLUDED.Адрес_СРО_АУ,
+                арбитр_ссылка = EXCLUDED.арбитр_ссылка,
+                АУ_инн = EXCLUDED.АУ_инн;
             '''
         values_crm = (
             data.get('дата'),
