@@ -64,7 +64,7 @@ def initialize_checked_messages_file():
 checked_messages = load_checked_messages()
 
 # метод для отслеживания времени перезагрузки
-def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
+def clear_form_periodically(target_hour, target_minute, restart_queue=None):
     """
     :param target_hour: Час запуска (по умолчанию 0 - полночь).
     :param target_minute: Минута запуска (по умолчанию 0).
@@ -230,7 +230,7 @@ def parse_all_pages_reverse(driver):
             except Exception as e:
                 logger.error(f"Ошибка при переходе на страницу {page_number}: {e}")
 
-                continue
+                return False
 
             # Помечаем страницу как обработанную
             visited_pages.add(page_number)

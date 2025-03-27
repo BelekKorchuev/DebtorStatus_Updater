@@ -53,7 +53,7 @@ def main():
         threads = []
 
         # Создаём потоки
-        clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
+        clear_thread = Thread(target=clear_form_periodically, args=(17, 00, restart_queue), daemon=True,
                               name="ClearFormThread")
 
         # Запускаем потоки
@@ -83,7 +83,9 @@ def main():
                     restart_signal = restart_queue.get()
                     if restart_signal:
                         logger.info("Перезапуск сессии WebDriver.")
-                        driver = restart_driver(driver)
+                        cleanup_virtual_display(driver)
+                        driver.quit()
+                        break
 
                 # Получаем новые сообщения
                 new_messages = fetch_and_parse_first_page(driver)
@@ -110,7 +112,7 @@ def main():
                     check_point = before_check(driver, prepared_data)
                     if check_point is None:
                         logger.error(f'Какая та ошибка в методе before_check: {prepared_data.get("должник_ссылка")}')
-                        continue
+                        break
 
                 except Exception as e:
                     logger.error(f"Ошибка при обработке сообщения: {e}")
