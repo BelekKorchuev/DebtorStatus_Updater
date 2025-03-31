@@ -168,149 +168,154 @@ def search_with_pagination(driver, link_debtor):
     """
     Парсинг всех сообщений из <tr> и переход на следующую страницу при наличии пагинации.
     """
-    logger.info('началась поиск всех актов у должника')
+    try:
+        logger.info('началась поиск всех актов у должника')
 
-    # Открываем новую вкладку
-    driver.execute_script(f"window.open('{link_debtor}');")
-    new_tab = driver.window_handles[-1]
-    driver.switch_to.window(new_tab)
+        # Открываем новую вкладку
+        driver.execute_script(f"window.open('{link_debtor}');")
+        new_tab = driver.window_handles[-1]
+        driver.switch_to.window(new_tab)
 
-    # Получаем HTML-код страницы
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    messages = []
-    limit = 0
-    checked_messages = set()
-    visited_pages = set()
-    needed_stop = False
-    while not needed_stop:
-        if limit == 10:
-            needed_stop = True
+        # Получаем HTML-код страницы
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        messages = []
+        limit = 0
+        checked_messages = set()
+        visited_pages = set()
+        needed_stop = False
+        while not needed_stop:
+            if limit == 10:
+                needed_stop = True
 
-        table = soup.find('table', class_='bank')
-        if table:
-            logger.info('нашел таблицу')
-            rows = table.find_all('tr')
-            for row in rows:
-                logger.info('нашел строки')
-                row_class = row.get('class', [])
-                if not row_class or 'row' in row_class:
-                    # Если это строка с данными сообщения
-                    cells = row.find_all('td')
-                    if len(cells) == 4:
-                        # Извлекаем данные из ячеек
-                        date = cells[0].get_text(strip=True)
-                        message_title = cells[1].get_text(strip=True)
-                        tag = cells[1].find('a')['href'] if cells[1].find("a") else None
+            table = soup.find('table', class_='bank')
+            if table:
+                logger.info('нашел таблицу')
+                rows = table.find_all('tr')
+                for row in rows:
+                    logger.info('нашел строки')
+                    row_class = row.get('class', [])
+                    if not row_class or 'row' in row_class:
+                        # Если это строка с данными сообщения
+                        cells = row.find_all('td')
+                        if len(cells) == 4:
+                            # Извлекаем данные из ячеек
+                            date = cells[0].get_text(strip=True)
+                            message_title = cells[1].get_text(strip=True)
+                            tag = cells[1].find('a')['href'] if cells[1].find("a") else None
 
-                        link = f"https://old.bankrot.fedresurs.ru{tag}"
+                            link = f"https://old.bankrot.fedresurs.ru{tag}"
 
-                        if "javascript:__doPostBa" in link:
-                            logger.info(f'это ссылка пагинации')
-                            continue
+                            if "javascript:__doPostBa" in link:
+                                logger.info(f'это ссылка пагинации')
+                                continue
 
-                        link_arbitr = cells[2].find("a")["href"] if cells[2].find("a") else None
-                        published_by = cells[2].get_text(strip=True)
+                            link_arbitr = cells[2].find("a")["href"] if cells[2].find("a") else None
+                            published_by = cells[2].get_text(strip=True)
 
-                        if link in checked_messages:
-                            needed_stop = True
-                            break
+                            if link in checked_messages:
+                                needed_stop = True
+                                break
 
-                        checked_messages.add(link)
-                        logger.info(message_title)
-                        if link:
-                            logger.info(f"Ссылка на сообщение: {link}")
-                            if "Сообщение о судебном акте" in message_title:
-                                logger.info(f'нашел {message_title}')
+                            checked_messages.add(link)
+                            logger.info(message_title)
+                            if link:
+                                logger.info(f"Ссылка на сообщение: {link}")
+                                if "Сообщение о судебном акте" in message_title:
+                                    logger.info(f'нашел {message_title}')
 
-                                message_face = {
-                                    "дата": date,
-                                    "тип_сообщения": message_title,
-                                    "должник": '',
-                                    "должник_ссылка": link_debtor if link else "Нет ссылки",
-                                    "арбитр": published_by,
-                                    "арбитр_ссылка": f"https://old.bankrot.fedresurs.ru{link_arbitr}" if link_arbitr else "Нет ссылки",
-                                    "сообщение_ссылка": link,
-                                }
-                                limit += 1
-                                messages.append(message_face)
+                                    message_face = {
+                                        "дата": date,
+                                        "тип_сообщения": message_title,
+                                        "должник": '',
+                                        "должник_ссылка": link_debtor if link else "Нет ссылки",
+                                        "арбитр": published_by,
+                                        "арбитр_ссылка": f"https://old.bankrot.fedresurs.ru{link_arbitr}" if link_arbitr else "Нет ссылки",
+                                        "сообщение_ссылка": link,
+                                    }
+                                    limit += 1
+                                    messages.append(message_face)
 
-            # Если это строка с пагинацией
-            pager_row = table.find('tr', class_='pager')
-            if not pager_row:
-                logger.info("Больше нет страниц для перехода.")
-                break
-            logger.info("Обнаружена таблица пагинации")
+                # Если это строка с пагинацией
+                pager_row = table.find('tr', class_='pager')
+                if not pager_row:
+                    logger.info("Больше нет страниц для перехода.")
+                    break
+                logger.info("Обнаружена таблица пагинации")
 
-            pager_table = pager_row.find_next('table')
-            if not pager_table:
-                logger.info("Таблица пагинации не найдена")
-                return
+                pager_table = pager_row.find_next('table')
+                if not pager_table:
+                    logger.info("Таблица пагинации не найдена")
+                    return
 
-            page_elements = pager_table.find_all('a', href=True)
-            if not page_elements:
-                logger.info("Ссылки пагинации отсутствуют")
-                return
+                page_elements = pager_table.find_all('a', href=True)
+                if not page_elements:
+                    logger.info("Ссылки пагинации отсутствуют")
+                    return
 
-            for page_element in page_elements:
+                for page_element in page_elements:
 
-                href = page_element['href']
-                logger.info(f'ссылка погинации {href}')
-                page_action = href.split("'")[3]  # Получаем 'Page$31'
-                logger.info(f"Обнаружено действие: {page_action}")
+                    href = page_element['href']
+                    logger.info(f'ссылка погинации {href}')
+                    page_action = href.split("'")[3]  # Получаем 'Page$31'
+                    logger.info(f"Обнаружено действие: {page_action}")
 
-                if page_action == 'Page$1':
-                    logger.info('уже проверял первую страницу')
-                    visited_pages.add(page_action)
-                    continue
-
-                if page_action in visited_pages:
-                    logger.info(f"Страница {page_action} уже обработана, пропускаем")
-                    continue
-
-                # Проверяем, начинается ли href с нужного JavaScript
-                if "javascript:__doPostBack" in href:
-                    try:
-                        script = """
-                            var theForm = document.forms['aspnetForm'];
-                            if (!theForm) {
-                                theForm = document.aspnetForm;
-                            }
-                            if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
-                                theForm.__EVENTTARGET.value = arguments[0];
-                                theForm.__EVENTARGUMENT.value = arguments[1];
-                                theForm.submit();
-                            }
-                            """
-                        logger.info(f"Клик по элементу пагинации: {page_action}")
-                        driver.execute_script(script, 'ctl00$cphBody$gvMessages', page_action)
-
-                        # element.click()  # Кликаем по элементу
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.TAG_NAME, 'html'))
-                        )
-                        time.sleep(3)  # Ожидание загрузки новой страницы
-
-                        # Обновляем soup для новой страницы и продолжаем обработку
-                        soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-
+                    if page_action == 'Page$1':
+                        logger.info('уже проверял первую страницу')
                         visited_pages.add(page_action)
-                        break
-                    except Exception as e:
-                        logger.error(f"Ошибка при клике на элемент пагинации: {e}")
+                        continue
 
-            else:
-                logger.info("Дополнительных страниц для перехода не найдено")
+                    if page_action in visited_pages:
+                        logger.info(f"Страница {page_action} уже обработана, пропускаем")
+                        continue
 
-    # Закрытие текущей вкладки
-    if len(driver.window_handles) == 2:
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])  # Переключаемся на последнюю вкладку
-    elif len(driver.window_handles) > 2:
-        for handle in driver.window_handles[1:][::-1]:
-            driver.switch_to.window(handle)
+                    # Проверяем, начинается ли href с нужного JavaScript
+                    if "javascript:__doPostBack" in href:
+                        try:
+                            script = """
+                                var theForm = document.forms['aspnetForm'];
+                                if (!theForm) {
+                                    theForm = document.aspnetForm;
+                                }
+                                if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+                                    theForm.__EVENTTARGET.value = arguments[0];
+                                    theForm.__EVENTARGUMENT.value = arguments[1];
+                                    theForm.submit();
+                                }
+                                """
+                            logger.info(f"Клик по элементу пагинации: {page_action}")
+                            driver.execute_script(script, 'ctl00$cphBody$gvMessages', page_action)
+
+                            # element.click()  # Кликаем по элементу
+                            WebDriverWait(driver, 10).until(
+                                EC.presence_of_element_located((By.TAG_NAME, 'html'))
+                            )
+                            time.sleep(3)  # Ожидание загрузки новой страницы
+
+                            # Обновляем soup для новой страницы и продолжаем обработку
+                            soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+
+                            visited_pages.add(page_action)
+                            break
+                        except Exception as e:
+                            logger.error(f"Ошибка при клике на элемент пагинации: {e}")
+
+                else:
+                    logger.info("Дополнительных страниц для перехода не найдено")
+
+        # Закрытие текущей вкладки
+        if len(driver.window_handles) == 2:
             driver.close()
-        driver.switch_to.window(driver.window_handles[0])
+            driver.switch_to.window(driver.window_handles[0])  # Переключаемся на последнюю вкладку
+        elif len(driver.window_handles) > 2:
+            for handle in driver.window_handles[1:][::-1]:
+                driver.switch_to.window(handle)
+                driver.close()
+            driver.switch_to.window(driver.window_handles[0])
 
-    logger.info('закончил поиск актов')
-    return messages
+        logger.info('закончил поиск актов')
+        return messages
+
+    except Exception as e:
+        logger.error(f"Ошибка при поиске актов: {e}")
+        return None

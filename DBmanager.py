@@ -421,11 +421,13 @@ def before_check(driver, data):
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
             list_dic = search_with_pagination(driver, debtor_link)
+            if list_dic is None:
+                return None
             founded_messages_list_dic = search_act(driver, list_dic, data)
-            logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
             if founded_messages_list_dic is None:
                 logger.warning(f'НЕ удалось спарсить найденный акт в search_act: {data.get("должник_ссылка")}')
                 return
+            logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
 
             prepared_data = prepare_data_for_db(founded_messages_list_dic)
 
