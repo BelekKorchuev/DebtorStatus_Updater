@@ -385,6 +385,38 @@ def status_au_updating(data):
         # if conn_default:
         #     conn_default.close()
 
+def insert_au_based_on_presence(au_link):
+    conn = get_db2_connection()
+    try:
+        with conn.cursor() as cur:
+            # Проверка, есть ли АУ с таким ИНН в crm_arbitr
+            cur.execute("SELECT 1 FROM crm_arbitr WHERE ссылка_ЕФРСБ = %s LIMIT 1", (au_link,))
+            result = cur.fetchone()
+
+            if result:
+                # Обновляем поле есть_нет на 'есть'
+                cur.execute(""" 
+                                    UPDATE debtor_status_ourdb
+                                    SET есть_нет = 'есть'
+                                    WHERE арбитр_ссылка = %s
+                                """, (au_link,))
+                logger.info(f"Данные успешно добавлены ЕСТЬ для {au_link}")
+            else:
+                # Вставляем нового с есть_нет = 'нет'
+                cur.execute("""
+                                    UPDATE debtor_status_ourdb
+                                    SET есть_нет = 'нет'
+                                    WHERE арбитр_ссылка = %s
+                                """, (au_link,))
+                logger.info(f"Данные успешно добавлены в НЕТ для {au_link}")
+
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при вставке АУ: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
 # проверка статуса должника
 def before_check(driver, data):
     status = data['cудебный_акт']
@@ -424,6 +456,8 @@ def before_check(driver, data):
             status_au_updating(data)
             logger.info('найден статус(Актуален Смена АУ) для обновления\n'
                         f'данные: {data}')
+
+            insert_au_based_on_presence(data)
 
             # list_dic = search_with_pagination(driver, debtor_link)
             # if list_dic is None:
