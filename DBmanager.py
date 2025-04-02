@@ -420,21 +420,26 @@ def before_check(driver, data):
                         f'данные: {data}')
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
-            list_dic = search_with_pagination(driver, debtor_link)
-            if list_dic is None:
-                return None
-            founded_messages_list_dic = search_act(driver, list_dic, data)
-            if founded_messages_list_dic is None:
-                logger.warning(f'НЕ удалось спарсить найденный акт в search_act: {data.get("должник_ссылка")}')
-                return
-            logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
+            data['актуальность'] = 'актуален'
+            status_au_updating(data)
+            logger.info('найден статус(Актуален Смена АУ) для обновления\n'
+                        f'данные: {data}')
 
-            prepared_data = prepare_data_for_db(founded_messages_list_dic)
-
-            logger.info(f'данные перепарсинные {prepared_data}')
-            if prepared_data:
-                prepared_data['актуальность'] = 'актуален'
-                status_au_updating(prepared_data)
+            # list_dic = search_with_pagination(driver, debtor_link)
+            # if list_dic is None:
+            #     return None
+            # founded_messages_list_dic = search_act(driver, list_dic, data)
+            # if founded_messages_list_dic is None:
+            #     logger.warning(f'НЕ удалось спарсить найденный акт в search_act: {data.get("должник_ссылка")}')
+            #     return
+            # logger.info(f'данные что еще не очищены {founded_messages_list_dic}')
+            #
+            # prepared_data = prepare_data_for_db(founded_messages_list_dic)
+            #
+            # logger.info(f'данные перепарсинные {prepared_data}')
+            # if prepared_data:
+            #     prepared_data['актуальность'] = 'актуален'
+            #     status_au_updating(prepared_data)
         else:
             logger.warning(f'статус не соответствует требованиям: {status}')
 
