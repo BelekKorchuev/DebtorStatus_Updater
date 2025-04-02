@@ -385,9 +385,12 @@ def status_au_updating(data):
         # if conn_default:
         #     conn_default.close()
 
-def insert_au_based_on_presence(au_link):
+def insert_au_based_on_presence(data):
     conn = get_db2_connection()
     try:
+        au_link = data['арбитр_ссылка']
+
+
         with conn.cursor() as cur:
             # Проверка, есть ли АУ с таким ИНН в crm_arbitr
             cur.execute("SELECT 1 FROM crm_arbitr WHERE ссылка_ЕФРСБ = %s LIMIT 1", (au_link,))
