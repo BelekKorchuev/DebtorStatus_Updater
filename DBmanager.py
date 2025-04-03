@@ -385,6 +385,41 @@ def status_au_updating(data):
         # if conn_default:
         #     conn_default.close()
 
+def insert_debtor_based_on_presence(data):
+    conn = get_db2_connection()
+    try:
+        debtor_link = data['должник_ссылка']
+
+
+        with conn.cursor() as cur:
+            # Проверка, есть ли АУ с таким ИНН в crm_arbitr
+            cur.execute("SELECT 1 FROM crm_debtor WHERE dolzhnik_ssylka_efrsb = %s LIMIT 1", (debtor_link,))
+            result = cur.fetchone()
+
+            if result:
+                # Обновляем поле есть_нет на 'есть'
+                cur.execute(""" 
+                                    UPDATE debtor_status_ourdb
+                                    SET есть_нет_дол = 'есть'
+                                    WHERE должник_ссылка = %s
+                                """, (debtor_link,))
+                logger.info(f"Данные успешно добавлены ЕСТЬ для {debtor_link}")
+            else:
+                # Вставляем нового с есть_нет = 'нет'
+                cur.execute("""
+                                    UPDATE debtor_status_ourdb
+                                    SET есть_нет_дол = 'нет'
+                                    WHERE должник_ссылка = %s
+                                """, (debtor_link,))
+                logger.info(f"Данные успешно добавлены в НЕТ для {debtor_link}")
+
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при вставке АУ: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
 def insert_au_based_on_presence(data):
     conn = get_db2_connection()
     try:
@@ -448,18 +483,24 @@ def before_check(driver, data):
             status_updating(data)
             logger.info('найден статус(Актуален) для обновления\n'
                         f'данные: {data}')
+
+            insert_debtor_based_on_presence(data)
+
         elif status in unuctual_status:
             data['актуальность'] = 'неактуален'
             status_updating(data)
             logger.info('найден статус(неАктуален) для обновления\n'
                         f'данные: {data}')
+
+            insert_debtor_based_on_presence(data)
+
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
             data['актуальность'] = 'актуален'
             status_au_updating(data)
             logger.info('найден статус(Актуален Смена АУ) для обновления\n'
                         f'данные: {data}')
-
+            insert_debtor_based_on_presence(data)
             insert_au_based_on_presence(data)
 
             # list_dic = search_with_pagination(driver, debtor_link)

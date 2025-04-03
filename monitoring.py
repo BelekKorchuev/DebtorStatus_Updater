@@ -280,7 +280,7 @@ def parse_all_pages_reverse(driver):
                             save_checked_messages(checked_messages)
                             if new_message:
                                 try:
-                                    parsed_data = parse_message_page(new_message, driver)
+                                    parsed_data = parse_message_page(new_message)
                                     logger.info(f'инфа из париснга сообщения {parsed_data}')
 
                                     prepared_data = prepare_data_for_db(parsed_data)

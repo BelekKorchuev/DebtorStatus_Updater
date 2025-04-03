@@ -18,7 +18,7 @@ list_of_status = {'о введении наблюдения',
 # changed_au = {'об утверждении арбитражного управляющего'}
 
 # парсинг содержимого сообщения
-def parse_message_page(data, driver):
+def parse_message_page(data):
     try:
 
         url = data['сообщение_ссылка']
@@ -78,6 +78,14 @@ def parse_message_page(data, driver):
 
         data.update({'файлы': " ".join(file_links)})
 
+        # Определение лица
+        inn = data['ИНН']
+        if len(inn) == 10:
+            data['ФЛ_ЮЛ'] = 'ЮЛ'
+        elif len(inn) == 12:
+            data['ФЛ_ЮЛ'] = 'ФЛ'
+        else:
+            data['ФЛ_ЮЛ'] = 'Не удалось определить'
         return data
     except Exception as e:
         logger.error(f'Не удалось спарсить содержимое сообщения: {e}')

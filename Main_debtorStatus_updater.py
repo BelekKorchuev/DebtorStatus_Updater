@@ -96,14 +96,13 @@ def main():
 
                 try:
                     # Парсим содержимое сообщения
-                    parsed_data = parse_message_page(new_messages, driver)
+                    parsed_data = parse_message_page(new_messages)
                     logger.info(f'инфа из париснга сообщения {parsed_data}')
                     if parsed_data is None:
                         pop_last_elem()
                         cleanup_virtual_display(driver)
                         driver.quit()
                         break
-
 
                     prepared_data = prepare_data_for_db(parsed_data)
                     logger.info(f'данные очищенныеф: {prepared_data}')
