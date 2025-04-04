@@ -108,7 +108,7 @@ def main():
                     logger.info(f'данные очищенныеф: {prepared_data}')
 
                     # метод для проверки статуса и отправки в базу данных
-                    check_point = before_check(driver, prepared_data)
+                    check_point = before_check(prepared_data)
                     if check_point is None:
                         logger.error(f'Какая та ошибка в методе before_check: {prepared_data.get("должник_ссылка")}')
                         break

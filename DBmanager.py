@@ -76,6 +76,7 @@ def prepare_data_for_db(raw_data):
         arbiter = clean_text(raw_data.get('арбитр', ''))
         arbiter_link = raw_data.get('арбитр_ссылка', '')
         message_link = raw_data.get('сообщение_ссылка', '')
+        debtor_type = raw_data.get('ФЛ_ЮЛ', 'Не определено')
 
         # Данные из содержимого сообщения
         judgment_act = clean_text(raw_data.get('Судебный акт', ''))
@@ -112,6 +113,7 @@ def prepare_data_for_db(raw_data):
             'арбитр': arbiter,
             'арбитр_ссылка': arbiter_link,
             'сообщение_ссылка': message_link,
+            'ФЛ_ЮЛ': debtor_type,
 
             'cудебный_акт': judgment_act,
             'наименование_должника': debtor_name,
@@ -165,8 +167,9 @@ def status_updating(data):
                 СНИЛС, 
                 Место_жительства,
                 Адрес,
-                ОГРН
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ОГРН,
+                ФЛ_ЮЛ
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (ИНН)
             DO UPDATE SET
                 дата = EXCLUDED.дата,
@@ -183,7 +186,8 @@ def status_updating(data):
                 СНИЛС = EXCLUDED.СНИЛС,
                 Место_жительства = EXCLUDED.Место_жительства,
                 Адрес = EXCLUDED.Адрес,
-                ОГРН = EXCLUDED.ОГРН;
+                ОГРН = EXCLUDED.ОГРН,
+                ФЛ_ЮЛ = EXCLUDED.ФЛ_ЮЛ;
             '''
         values_crm = (
             data.get('дата'),
@@ -202,6 +206,7 @@ def status_updating(data):
             data.get("место_жительства"),
             data.get("адрес"),
             data.get("ОГРН"),
+            data.get("ФЛ_ЮЛ"),
         )
         cursor_crm.execute(query_crm, values_crm)
         logger.info('отправил данные в срм')
@@ -278,8 +283,9 @@ def status_au_updating(data):
                 СРО_АУ,
                 Адрес_СРО_АУ,
                 арбитр_ссылка,
-                АУ_инн
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                АУ_инн,
+                ФЛ_ЮЛ
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (ИНН) DO UPDATE SET
                 дата = EXCLUDED.дата,
                 сообщение_ссылка = EXCLUDED.сообщение_ссылка,  
@@ -303,7 +309,8 @@ def status_au_updating(data):
                 СРО_АУ = EXCLUDED.СРО_АУ,
                 Адрес_СРО_АУ = EXCLUDED.Адрес_СРО_АУ,
                 арбитр_ссылка = EXCLUDED.арбитр_ссылка,
-                АУ_инн = EXCLUDED.АУ_инн;
+                АУ_инн = EXCLUDED.АУ_инн,
+                ФЛ_ЮЛ = EXCLUDED.ФЛ_ЮЛ;
             '''
         values_crm = (
             data.get('дата'),
@@ -330,6 +337,7 @@ def status_au_updating(data):
             data.get('адрес_СРО_АУ'),
             data.get('арбитр_ссылка'),
             data.get('АУ_инн'),
+            data.get('ФЛ_ЮЛ'),
         )
         cursor_crm.execute(query_crm, values_crm)
 
@@ -456,7 +464,7 @@ def insert_au_based_on_presence(data):
         conn.close()
 
 # проверка статуса должника
-def before_check(driver, data):
+def before_check(data):
     status = data['cудебный_акт']
     debtor_link = data['должник_ссылка']
 
