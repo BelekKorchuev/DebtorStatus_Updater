@@ -411,7 +411,7 @@ def insert_debtor_based_on_presence(data):
                                     SET есть_нет_дол = 'есть'
                                     WHERE должник_ссылка = %s
                                 """, (debtor_link,))
-                logger.info(f"Данные успешно добавлены ЕСТЬ для {debtor_link}")
+                logger.info(f"Данные Должника ЕСТЬ для {debtor_link}")
             else:
                 # Вставляем нового с есть_нет = 'нет'
                 cur.execute("""
@@ -419,7 +419,7 @@ def insert_debtor_based_on_presence(data):
                                     SET есть_нет_дол = 'нет'
                                     WHERE должник_ссылка = %s
                                 """, (debtor_link,))
-                logger.info(f"Данные успешно добавлены в НЕТ для {debtor_link}")
+                logger.info(f"Данные Должника НЕТ для {debtor_link}")
 
         conn.commit()
     except Exception as e:
@@ -432,6 +432,7 @@ def insert_au_based_on_presence(data):
     conn = get_db2_connection()
     try:
         au_link = data['арбитр_ссылка']
+        debtor_link = data['должник_ссылка']
 
 
         with conn.cursor() as cur:
@@ -443,18 +444,18 @@ def insert_au_based_on_presence(data):
                 # Обновляем поле есть_нет на 'есть'
                 cur.execute(""" 
                                     UPDATE debtor_status_ourdb
-                                    SET есть_нет = 'есть'
-                                    WHERE арбитр_ссылка = %s
-                                """, (au_link,))
-                logger.info(f"Данные успешно добавлены ЕСТЬ для {au_link}")
+                                    SET есть_нет_ау = 'есть'
+                                    WHERE должник_ссылка = %s
+                                """, (debtor_link,))
+                logger.info(f"Данные АУ ЕСТЬ для {au_link}")
             else:
                 # Вставляем нового с есть_нет = 'нет'
                 cur.execute("""
                                     UPDATE debtor_status_ourdb
-                                    SET есть_нет = 'нет'
-                                    WHERE арбитр_ссылка = %s
-                                """, (au_link,))
-                logger.info(f"Данные успешно добавлены в НЕТ для {au_link}")
+                                    SET есть_нет_ау = 'нет'
+                                    WHERE должник_ссылка = %s
+                                """, (debtor_link,))
+                logger.info(f"Данные АУ в НЕТ для {au_link}")
 
         conn.commit()
     except Exception as e:
@@ -493,6 +494,7 @@ def before_check(data):
                         f'данные: {data}')
 
             insert_debtor_based_on_presence(data)
+            insert_au_based_on_presence(data)
 
         elif status in unuctual_status:
             data['актуальность'] = 'неактуален'
@@ -501,6 +503,7 @@ def before_check(data):
                         f'данные: {data}')
 
             insert_debtor_based_on_presence(data)
+            insert_au_based_on_presence(data)
 
         elif status in changed_au:
             logger.info(f'найден новый ау у должника')
